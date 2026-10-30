@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    body {
+        @apply bg-neutral-50 text-neutral-900;
+    }
+
+    h1,
+    h2,
+    h3 {
+        @apply font-serif font-semibold;
+    }
+}
+
+@layer components {
+    .card {
+        @apply rounded-2xl bg-white shadow-soft;
+    }
+
+    /* Signature thin gold line under page titles. */
+    .gold-rule {
+        @apply mt-2 h-0.5 w-16 bg-gold-500;
+    }
+
+    /* Deep red gradient with a faint gold glow from above. */
+    .bg-hero {
+        background:
+            radial-gradient(ellipse at 50% 0%, rgba(212, 175, 55, 0.1), transparent 70%),
+            linear-gradient(135deg, theme('colors.primary.900'), theme('colors.primary.700'));
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
