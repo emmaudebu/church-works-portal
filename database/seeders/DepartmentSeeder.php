@@ -25,5 +25,11 @@ class DepartmentSeeder extends Seeder
 
             Department::where('slug', $slug)->whereNull('about')->update(['about' => $about]);
         }
+
+        $technicalUnit = Department::firstWhere('slug', 'technical-unit');
+
+        foreach (['Sound', 'Media', 'Lighting', 'Projection'] as $unit) {
+            $technicalUnit->units()->firstOrCreate(['name' => $unit]);
+        }
     }
 }

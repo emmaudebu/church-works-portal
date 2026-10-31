@@ -76,12 +76,8 @@ class SiteController extends Controller
 
         return Inertia::render('Site/Department', [
             'department' => $department->toCard(),
-            'units' => $department->users()
-                ->where('status', 'active')
-                ->whereNotNull('unit')
-                ->distinct()
-                ->orderBy('unit')
-                ->pluck('unit'),
+            'units' => $department->units->pluck('name'),
+            'gallery' => $department->images->map->toCard(),
             'events' => (clone $posts)->where('type', 'event')->where('event_date', '>=', now())
                 ->orderBy('event_date')->limit(3)->get()->map->toCard(),
             'news' => (clone $posts)->where('type', 'news')->latest('published_at')->limit(3)->get()->map->toCard(),

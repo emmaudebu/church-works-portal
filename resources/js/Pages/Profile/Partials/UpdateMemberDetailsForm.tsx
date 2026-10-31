@@ -19,6 +19,7 @@ export default function UpdateMemberDetailsForm({
 }: {
     member: Parameters<typeof bioDataFrom>[0] & {
         certificate_urls: { foundation: string | null; wofbi: string | null };
+        units: string[];
     };
 }) {
     const { user } = usePage<PageProps>().props.auth;
@@ -55,7 +56,11 @@ export default function UpdateMemberDetailsForm({
                 onChange={(file) => setData('photo', file)}
             />
             <PersonalFields form={form} />
-            <ChurchFields form={form} certificateUrls={member.certificate_urls} />
+            <ChurchFields
+                form={form}
+                certificateUrls={member.certificate_urls}
+                units={member.units}
+            />
             <EmergencyFields form={form} />
             <ExtraFields form={form} />
             <div className="flex items-center gap-4">

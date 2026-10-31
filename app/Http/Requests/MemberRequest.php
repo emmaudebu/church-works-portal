@@ -25,6 +25,7 @@ abstract class MemberRequest extends FormRequest
     public function messages(): array
     {
         return [
+            'email.required' => 'Your email is needed so you can reset a forgotten password.',
             'phone.regex' => 'Enter a full phone number, for example 0801 234 5678.',
             'next_of_kin_phone.regex' => 'Enter a full phone number, for example 0801 234 5678.',
             'foundation_certificate.required_if_accepted' => 'Please upload your Foundation class certificate.',

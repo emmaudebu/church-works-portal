@@ -32,6 +32,7 @@ function bioPayload(User $member, array $overrides = []): array
         'gender' => 'male',
         'date_of_birth' => '1990-01-01',
         'phone' => $member->phone,
+        'email' => $member->email,
         'address' => 'New address',
         'unit' => 'Media',
         'next_of_kin_name' => 'Kin',
@@ -351,6 +352,18 @@ test('an admin can mark a class without a certificate and upload one for the mem
     ]))->assertSessionHasNoErrors();
 
     Storage::disk('local')->assertExists($this->member->fresh()->wofbi_certificate);
+});
+
+test('a member saving their profile must give an email', function () {
+    $this->actingAs($this->member)->patch('/profile', bioPayload($this->member, ['email' => '']))
+        ->assertSessionHasErrors('email');
+});
+
+test('an admin can still update someone who has no email yet', function () {
+    $this->member->update(['email' => null]);
+
+    $this->actingAs($this->deptAdmin)->patch(route('admin.members.update', $this->member), bioPayload($this->member, ['email' => '']))
+        ->assertSessionHasNoErrors();
 });
 
 test('admin notes are not exposed to the member', function () {

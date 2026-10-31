@@ -13,6 +13,7 @@ import {
     ChevronsLeft,
     ChevronsRight,
     LayoutDashboard,
+    LucideIcon,
     Menu,
     Newspaper,
     ScanLine,
@@ -20,18 +21,56 @@ import {
     Settings,
     Users,
     Vote,
+    Wallet,
     X,
 } from 'lucide-react';
 import { FormEventHandler, PropsWithChildren, useState } from 'react';
 
-const navItems = [
+const navItems: {
+    label: string;
+    route: string;
+    icon: LucideIcon;
+    superAdmin?: boolean;
+    permission?: string;
+}[] = [
     { label: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard },
     { label: 'Members', route: 'admin.members', icon: Users },
-    { label: 'Scanner', route: 'admin.scanner', icon: ScanLine },
-    { label: 'Services', route: 'admin.services', icon: CalendarClock },
-    { label: 'Reports', route: 'admin.reports', icon: BarChart3 },
-    { label: 'Posts', route: 'admin.posts', icon: Newspaper },
-    { label: 'Elections', route: 'admin.elections', icon: Vote },
+    {
+        label: 'Scanner',
+        route: 'admin.scanner',
+        icon: ScanLine,
+        permission: 'take_attendance',
+    },
+    {
+        label: 'Services',
+        route: 'admin.services',
+        icon: CalendarClock,
+        permission: 'manage_services',
+    },
+    {
+        label: 'Reports',
+        route: 'admin.reports',
+        icon: BarChart3,
+        permission: 'view_reports',
+    },
+    {
+        label: 'Payments',
+        route: 'admin.payments',
+        icon: Wallet,
+        permission: 'view_payments',
+    },
+    {
+        label: 'Posts',
+        route: 'admin.posts',
+        icon: Newspaper,
+        permission: 'manage_posts',
+    },
+    {
+        label: 'Elections',
+        route: 'admin.elections',
+        icon: Vote,
+        permission: 'manage_elections',
+    },
     {
         label: 'Departments',
         route: 'admin.departments',
@@ -63,18 +102,45 @@ function SidebarNav({
     collapsed: boolean;
     isSuperAdmin: boolean;
 }) {
+    const { department_id: departmentId, permissions } =
+        usePage<PageProps>().props.auth.user;
+
+    const ownDepartment =
+        !isSuperAdmin &&
+        departmentId &&
+        permissions.includes('manage_department')
+            ? [
+                  {
+                      label: 'My department',
+                      route: 'admin.departments.manage',
+                      icon: Building2,
+                      params: departmentId,
+                      superAdmin: false,
+                  },
+              ]
+            : [];
+
     return (
         <nav aria-label="Admin" className="flex-1 space-y-1 overflow-y-auto p-3">
-            {navItems
-                .filter((item) => !item.superAdmin || isSuperAdmin)
+            {[
+                ...navItems.filter(
+                    (item) =>
+                        (!item.superAdmin || isSuperAdmin) &&
+                        (!item.permission ||
+                            permissions.includes(item.permission)),
+                ),
+                ...ownDepartment,
+            ]
                 .map((item) => {
                     const active = route().current(item.route);
                     const Icon = item.icon;
+                    const params =
+                        'params' in item ? (item.params as number) : undefined;
 
                     return (
                         <Link
                             key={item.route}
-                            href={route(item.route)}
+                            href={route(item.route, params)}
                             aria-current={active ? 'page' : undefined}
                             aria-label={collapsed ? item.label : undefined}
                             title={collapsed ? item.label : undefined}
@@ -95,6 +161,18 @@ function SidebarNav({
                     );
                 })}
         </nav>
+    );
+}
+
+function HomeLogo({ src }: { src: string }) {
+    return (
+        <Link
+            href={route('home')}
+            aria-label="Go to the homepage"
+            className="rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
+        >
+            <img src={src} alt="" className="h-9 w-auto" />
+        </Link>
     );
 }
 
@@ -196,15 +274,11 @@ export default function AdminLayout({ children }: PropsWithChildren) {
             >
                 <div className="flex h-16 items-center px-4">
                     {collapsed ? (
-                        <img
-                            src={branding.logo_dark_url}
-                            alt=""
-                            className="h-9 w-auto"
-                        />
+                        <HomeLogo src={branding.logo_dark_url} />
                     ) : (
                         <Logo
                             variant="dark"
-                            href={route('admin.dashboard')}
+                            href={route('home')}
                             wordmarkClassName="text-white"
                         />
                     )}
@@ -235,11 +309,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                 <DialogBackdrop className="fixed inset-0 bg-charcoal-900/60" />
                 <DialogPanel className="fixed inset-y-0 left-0 flex w-64 flex-col bg-primary-900">
                     <div className="flex h-16 items-center justify-between px-4">
-                        <img
-                            src={branding.logo_dark_url}
-                            alt=""
-                            className="h-9 w-auto"
-                        />
+                        <HomeLogo src={branding.logo_dark_url} />
                         <button
                             type="button"
                             onClick={() => setDrawerOpen(false)}

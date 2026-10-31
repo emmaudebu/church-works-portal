@@ -33,8 +33,6 @@ export type BioFormProps = {
 const selectClass =
     'mt-1 block w-full rounded-lg border-neutral-200 focus:border-primary-700 focus:ring-primary-700';
 
-const UNITS = ['Sound', 'Media', 'Lighting', 'Projection'];
-
 const SKILLS = [
     'Sound mixing',
     'Video editing',
@@ -282,7 +280,13 @@ function SkillsInput({ form }: { form: BioFormProps }) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function PersonalFields({ form }: { form: BioFormProps }) {
+export function PersonalFields({
+    form,
+    emailRequired = true,
+}: {
+    form: BioFormProps;
+    emailRequired?: boolean;
+}) {
     return (
         <div className="space-y-4">
             <Text
@@ -321,6 +325,7 @@ export function PersonalFields({ form }: { form: BioFormProps }) {
                 label="Email"
                 type="email"
                 autoComplete="email"
+                required={emailRequired}
             />
             <Text
                 form={form}
@@ -336,29 +341,41 @@ export function PersonalFields({ form }: { form: BioFormProps }) {
 export function ChurchFields({
     form,
     certificateUrls,
+    units = [],
 }: {
     form: BioFormProps;
     certificateUrls?: { foundation: string | null; wofbi: string | null };
+    units?: string[];
 }) {
     return (
         <div className="space-y-4">
             <Field id="unit" label="Unit" error={form.errors.unit}>
-                <TextInput
-                    id="unit"
-                    list="unit-options"
-                    value={form.data.unit}
-                    placeholder="For example Sound or Media"
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                        form.set('unit', e.target.value)
-                    }
-                    required
-                    className="mt-1 block w-full"
-                />
-                <datalist id="unit-options">
-                    {UNITS.map((unit) => (
-                        <option key={unit} value={unit} />
-                    ))}
-                </datalist>
+                {units.length > 0 ? (
+                    <select
+                        id="unit"
+                        value={form.data.unit}
+                        required
+                        onChange={(e) => form.set('unit', e.target.value)}
+                        className={selectClass}
+                    >
+                        <option value="">Choose</option>
+                        {units.map((unit) => (
+                            <option key={unit} value={unit}>
+                                {unit}
+                            </option>
+                        ))}
+                    </select>
+                ) : (
+                    <TextInput
+                        id="unit"
+                        value={form.data.unit}
+                        onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                            form.set('unit', e.target.value)
+                        }
+                        required
+                        className="mt-1 block w-full"
+                    />
+                )}
             </Field>
             <Text
                 form={form}

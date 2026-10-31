@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\UpdateMemberRequest;
 use App\Models\Department;
 use App\Models\MemberProfile;
+use App\Models\Unit;
 use App\Models\User;
 use App\Support\AttendanceStats;
 use App\Support\Certificates;
@@ -88,7 +89,7 @@ class MemberController extends Controller
             'attendance' => [
                 ...AttendanceStats::rates(collect([$member]), $held)[$member->id],
                 'recent' => $member->attendance()
-                    ->with('service:id,title,date')
+                    ->with(['service:id,title,date', 'recorder:id,full_name'])
                     ->latest('checked_in_at')
                     ->limit(10)
                     ->get()
@@ -97,9 +98,11 @@ class MemberController extends Controller
                         'service' => $row->service->title,
                         'date' => $row->service->date->format('D j M Y'),
                         'method' => $row->method,
+                        'marked_by' => $row->method === 'manual' ? $row->recorder?->full_name : null,
                     ]),
             ],
             'can_manage' => $request->user()->canManage($member),
+            'payments' => $member->payments()->where('status', 'success')->latest('paid_at')->limit(20)->get()->map->toRow(),
             'logs' => $member->suspensionLogs->map(fn ($log) => [
                 'id' => $log->id,
                 'action' => $log->action,
@@ -124,6 +127,7 @@ class MemberController extends Controller
             'departments' => $request->user()->hasRole('super_admin')
                 ? Department::where('status', 'active')->orWhere('id', $member->department_id)->orderBy('name')->get(['id', 'name'])
                 : null,
+            'units' => Unit::orderBy('name')->get(['department_id', 'name'])->groupBy('department_id')->map->pluck('name'),
         ]);
     }
 

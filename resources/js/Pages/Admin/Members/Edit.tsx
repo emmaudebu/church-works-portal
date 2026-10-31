@@ -20,9 +20,11 @@ import { FormEventHandler } from 'react';
 export default function Edit({
     member,
     departments,
+    units,
 }: {
     member: MemberRecord;
     departments: { id: number; name: string }[] | null;
+    units: Record<string, string[]>;
 }) {
     const { data, setData, post, processing, errors } = useForm<
         BioData & {
@@ -66,7 +68,7 @@ export default function Edit({
                         error={errors.photo}
                         onChange={(file) => setData('photo', file)}
                     />
-                    <PersonalFields form={form} />
+                    <PersonalFields form={form} emailRequired={false} />
                 </section>
 
                 <section className="card space-y-4 p-4 sm:p-6">
@@ -120,6 +122,7 @@ export default function Edit({
                     <ChurchFields
                         form={form}
                         certificateUrls={member.certificate_urls}
+                        units={units[data.department_id] ?? []}
                     />
                 </section>
 

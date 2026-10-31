@@ -4,11 +4,7 @@ namespace App\Support;
 
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Intervention\Image\Drivers\Gd\Driver;
-use Intervention\Image\ImageManager;
 
 /**
  * Class certificates are personal documents, so they live on the private disk.
@@ -25,8 +21,6 @@ class Certificates
 
     public const TYPES = ['foundation' => 'foundation_certificate', 'wofbi' => 'wofbi_certificate'];
 
-    private const MAX_IMAGE_WIDTH = 2000;
-
     /**
      * Swap uploaded files in the validated data for stored paths, and remove a
      * certificate when its class is changed back to "no".
@@ -42,7 +36,7 @@ class Certificates
             $answeredNo = array_key_exists($answer, $data) && ! $data[$answer];
 
             if ($request->hasFile($field) && ! $answeredNo) {
-                $data[$field] = self::store($request->file($field), $user?->{$field});
+                $data[$field] = PrivateDocument::store($request->file($field), 'certificates', $user?->{$field});
             } elseif ($user?->{$field} && $answeredNo) {
                 Storage::disk('local')->delete($user->{$field});
                 $data[$field] = null;
@@ -50,31 +44,6 @@ class Certificates
         }
 
         return $data;
-    }
-
-    /**
-     * Pictures are re-encoded, which also strips anything hidden inside them.
-     */
-    private static function store(UploadedFile $file, ?string $replaces): string
-    {
-        $isPdf = $file->getMimeType() === 'application/pdf';
-        $path = 'certificates/'.Str::uuid().($isPdf ? '.pdf' : '.jpg');
-
-        $contents = $isPdf
-            ? $file->getContent()
-            : (string) ImageManager::usingDriver(Driver::class)
-                ->decodePath($file->getRealPath())
-                ->orient()
-                ->scaleDown(width: self::MAX_IMAGE_WIDTH)
-                ->encodeUsingMediaType('image/jpeg', quality: 85);
-
-        Storage::disk('local')->put($path, $contents);
-
-        if ($replaces) {
-            Storage::disk('local')->delete($replaces);
-        }
-
-        return $path;
     }
 
     /**

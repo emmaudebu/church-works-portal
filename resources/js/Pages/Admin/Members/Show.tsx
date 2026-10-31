@@ -10,6 +10,7 @@ import SecondaryButton from '@/Components/SecondaryButton';
 import DangerButton from '@/Components/DangerButton';
 import StatusBadge from '@/Components/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
+import { naira } from '@/lib/money';
 import { useWhatsapp } from '@/lib/whatsapp';
 import { MemberRecord } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -55,15 +56,27 @@ export default function Show({
     can_manage,
     logs,
     attendance,
+    payments,
 }: {
     member: MemberRecord;
     can_manage: boolean;
     logs: Log[];
+    payments: {
+        id: number;
+        purpose: string;
+        period: string;
+        amount: number;
+    }[];
     attendance: {
         attended: number;
         total: number;
         rate: number | null;
-        recent: { id: number; service: string; date: string }[];
+        recent: {
+            id: number;
+            service: string;
+            date: string;
+            marked_by: string | null;
+        }[];
     };
 }) {
     const actions = useMemberActions();
@@ -280,9 +293,41 @@ export default function Show({
                                     key={row.id}
                                     className="flex justify-between gap-4 py-2"
                                 >
-                                    <span>{row.service}</span>
+                                    <span>
+                                        {row.service}
+                                        {row.marked_by && (
+                                            <span className="block text-xs text-neutral-600">
+                                                Marked present by{' '}
+                                                {row.marked_by}
+                                            </span>
+                                        )}
+                                    </span>
                                     <span className="text-neutral-600">
                                         {row.date}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </Section>
+
+                <Section title="Payments">
+                    {payments.length === 0 ? (
+                        <p className="text-sm text-neutral-600">
+                            No payments recorded.
+                        </p>
+                    ) : (
+                        <ul className="divide-y divide-neutral-200 text-sm">
+                            {payments.map((payment) => (
+                                <li
+                                    key={payment.id}
+                                    className="flex justify-between gap-4 py-2"
+                                >
+                                    <span>
+                                        {payment.purpose} · {payment.period}
+                                    </span>
+                                    <span className="tabular-nums">
+                                        {naira(payment.amount)}
                                     </span>
                                 </li>
                             ))}

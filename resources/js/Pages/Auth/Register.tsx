@@ -51,7 +51,7 @@ function Review({ rows }: { rows: [string, string][] }) {
 export default function Register({
     departments,
 }: {
-    departments: { id: number; name: string }[];
+    departments: { id: number; name: string; units: string[] }[];
 }) {
     const [step, setStep] = useState(0);
     const heading = useRef<HTMLHeadingElement>(null);
@@ -186,7 +186,11 @@ export default function Register({
                                 value={data.department_id}
                                 required
                                 onChange={(e) =>
-                                    setData('department_id', e.target.value)
+                                    setData({
+                                        ...data,
+                                        department_id: e.target.value,
+                                        unit: '',
+                                    })
                                 }
                                 className="mt-1 block w-full rounded-lg border-neutral-200 focus:border-primary-700 focus:ring-primary-700"
                             >
@@ -202,7 +206,10 @@ export default function Register({
                                 className="mt-2"
                             />
                         </div>
-                        <ChurchFields form={form} />
+                        <ChurchFields
+                            form={form}
+                            units={department?.units}
+                        />
                     </>
                 )}
 
@@ -225,6 +232,7 @@ export default function Register({
                             rows={[
                                 ['Full name', data.full_name],
                                 ['Phone', data.phone],
+                                ['Email', data.email],
                                 ['Department', department?.name ?? ''],
                                 ['Unit', data.unit],
                                 ['Next of kin', data.next_of_kin_name],

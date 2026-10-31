@@ -35,7 +35,7 @@ class CheckIn
 
     /**
      * Mark someone present by hand, which also lets an admin fix a missed scan
-     * after the window has closed.
+     * after the window has closed. A service that hasn't happened can't be attended.
      *
      * @return array<string, mixed>
      */
@@ -43,6 +43,10 @@ class CheckIn
     {
         if ($member->department_id !== $service->department_id) {
             return ['status' => 'invalid'];
+        }
+
+        if ($service->date->isFuture()) {
+            return ['status' => 'closed'];
         }
 
         return self::record($service, $member, 'manual', $admin);

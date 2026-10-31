@@ -25,7 +25,14 @@ class RegisteredUserController extends Controller
     public function create(): Response
     {
         return Inertia::render('Auth/Register', [
-            'departments' => Department::where('status', 'active')->orderBy('name')->get(['id', 'name']),
+            'departments' => Department::where('status', 'active')
+                ->with('units:id,department_id,name')
+                ->orderBy('name')
+                ->get(['id', 'name'])
+                ->map(fn (Department $department) => [
+                    ...$department->only(['id', 'name']),
+                    'units' => $department->units->pluck('name'),
+                ]),
         ]);
     }
 

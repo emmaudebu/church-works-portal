@@ -27,7 +27,7 @@ class ProfileUpdateRequest extends MemberRequest
 
         return [
             ...MemberRules::personal($user),
-            ...MemberRules::church(),
+            ...MemberRules::church($user->department_id),
             ...MemberRules::certificates($user),
             ...MemberRules::emergencyAndExtra(),
             'photo' => ['nullable', ...MemberRules::photo()],

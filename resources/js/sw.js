@@ -31,3 +31,25 @@ registerRoute(
         }
     }),
 );
+
+self.addEventListener('push', (event) => {
+    const payload = event.data?.json() ?? {};
+
+    event.waitUntil(
+        self.registration.showNotification(payload.title ?? 'New update', {
+            body: payload.body,
+            icon: payload.icon ?? '/images/icons/icon-192.png',
+            badge: '/images/icons/icon-192.png',
+            data: payload.data,
+        }),
+    );
+});
+
+self.addEventListener('notificationclick', (event) => {
+    event.notification.close();
+
+    const url = new URL(event.notification.data?.url ?? '/', self.location.origin);
+
+    // Only ever open this site, whatever the message says.
+    event.waitUntil(self.clients.openWindow(url.origin === self.location.origin ? url.href : '/'));
+});

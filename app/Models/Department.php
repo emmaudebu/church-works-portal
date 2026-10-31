@@ -10,11 +10,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'slug', 'icon', 'description', 'image', 'about', 'status'])]
+#[Fillable(['name', 'slug', 'icon', 'description', 'image', 'about', 'bank_name', 'account_number', 'account_name', 'status'])]
 class Department extends Model
 {
     /** @use HasFactory<DepartmentFactory> */
     use HasFactory;
+
+    public const ICONS = [
+        'building', 'monitor-speaker', 'music', 'hand-heart', 'mic', 'camera', 'book-open',
+        'baby', 'shield', 'sparkles', 'heart-handshake', 'car', 'utensils', 'flower',
+    ];
 
     /**
      * Pictures for departments that have not uploaded their own.
@@ -40,6 +45,35 @@ class Department extends Model
             'members_count' => (int) ($this->members_count ?? 0),
             'image_url' => $this->imageUrl(),
         ];
+    }
+
+    public function hasBankAccount(): bool
+    {
+        return filled($this->bank_name) && filled($this->account_number) && filled($this->account_name);
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    public function bankAccount(): array
+    {
+        return $this->only(['bank_name', 'account_number', 'account_name']);
+    }
+
+    /**
+     * @return HasMany<Unit, $this>
+     */
+    public function units(): HasMany
+    {
+        return $this->hasMany(Unit::class)->orderBy('name');
+    }
+
+    /**
+     * @return HasMany<DepartmentImage, $this>
+     */
+    public function images(): HasMany
+    {
+        return $this->hasMany(DepartmentImage::class)->latest('id');
     }
 
     /**

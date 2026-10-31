@@ -1,8 +1,8 @@
 import AttendanceChart from '@/Components/AttendanceChart';
 import Avatar from '@/Components/Avatar';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { CheckedInMember, TrendPoint } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { CheckedInMember, PageProps, TrendPoint } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     CalendarCheck,
     Hourglass,
@@ -74,6 +74,8 @@ export default function Dashboard({
     }[];
     recent: CheckedInMember[];
 }) {
+    const { permissions } = usePage<PageProps>().props.auth.user;
+
     const members = (status?: string) =>
         route('admin.members', status ? { status } : {});
 
@@ -87,29 +89,35 @@ export default function Dashboard({
                     <div className="gold-rule" />
                 </div>
                 <div className="flex flex-wrap gap-2">
-                    <Link
-                        href={route('admin.scanner')}
-                        className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
-                    >
-                        <ScanLine
-                            size={20}
-                            strokeWidth={1.75}
-                            aria-hidden="true"
-                        />
-                        Start attendance
-                    </Link>
-                    <Link
-                        href={route('admin.posts.create')}
-                        className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
-                    >
-                        New post
-                    </Link>
-                    <Link
-                        href={route('admin.elections')}
-                        className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
-                    >
-                        New election
-                    </Link>
+                    {permissions.includes('take_attendance') && (
+                        <Link
+                            href={route('admin.scanner')}
+                            className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                        >
+                            <ScanLine
+                                size={20}
+                                strokeWidth={1.75}
+                                aria-hidden="true"
+                            />
+                            Start attendance
+                        </Link>
+                    )}
+                    {permissions.includes('manage_posts') && (
+                        <Link
+                            href={route('admin.posts.create')}
+                            className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                        >
+                            New post
+                        </Link>
+                    )}
+                    {permissions.includes('manage_elections') && (
+                        <Link
+                            href={route('admin.elections')}
+                            className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                        >
+                            New election
+                        </Link>
+                    )}
                 </div>
             </div>
 

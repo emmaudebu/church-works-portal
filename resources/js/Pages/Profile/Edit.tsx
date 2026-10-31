@@ -1,4 +1,5 @@
 import InstallApp from '@/Components/InstallApp';
+import PushSettings from '@/Components/PushSettings';
 import AccountLayout from '@/Layouts/AccountLayout';
 import { PageProps } from '@/types';
 import { Head, Link } from '@inertiajs/react';
@@ -11,7 +12,9 @@ export default function Edit({
     mustVerifyEmail,
     status,
     member,
+    vapidPublicKey,
 }: PageProps<{
+    vapidPublicKey: string | null;
     mustVerifyEmail: boolean;
     status?: string;
     member: Parameters<typeof UpdateMemberDetailsForm>[0]['member'] | null;
@@ -45,6 +48,15 @@ export default function Edit({
                 <div className="card p-4 sm:p-8">
                     <UpdatePasswordForm />
                 </div>
+
+                <Link
+                    href={route('member.payments')}
+                    className="card block p-4 font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 sm:p-8"
+                >
+                    My dues and payments
+                </Link>
+
+                <PushSettings vapidPublicKey={vapidPublicKey} />
 
                 <InstallApp />
 

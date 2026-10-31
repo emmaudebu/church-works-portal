@@ -24,7 +24,7 @@ export default function Feed({
     calendar: CalendarEvent[];
 }) {
     return (
-        <MemberLayout>
+        <MemberLayout wide>
             <Head title="News & Events" />
 
             <h1 className="text-3xl">News &amp; Events</h1>
@@ -58,7 +58,7 @@ export default function Feed({
             {posts.data.length === 0 ? (
                 <EmptyState icon={Newspaper} message="Nothing here yet." />
             ) : (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {posts.data.map((post, index) => (
                         <PostCard
                             key={post.id}

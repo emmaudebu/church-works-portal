@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Service;
 use App\Models\User;
+use App\Support\Offices;
+use App\Support\Paystack;
 use App\Support\PostImage;
 use App\Support\ServiceGenerator;
 use App\Support\Settings;
@@ -12,6 +14,7 @@ use Closure;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -20,6 +23,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Intervention\Image\Drivers\Gd\Driver;
 use Intervention\Image\ImageManager;
+use Spatie\Permission\Models\Role;
 
 class SettingsController extends Controller
 {
@@ -39,6 +43,19 @@ class SettingsController extends Controller
             'whatsapp' => Settings::whatsapp(),
             'popup' => Settings::presentPopup(Settings::popup()),
             'home' => Settings::presentHome(),
+            'paystack' => [
+                'public_key' => Settings::get('paystack_public'),
+                'configured' => Paystack::isConfigured(),
+                'secret_hint' => Paystack::isConfigured() ? substr((string) Paystack::secretKey(), -4) : null,
+                'webhook_url' => route('paystack.webhook'),
+            ],
+            'offices' => collect(Offices::LABELS)->map(fn (string $label, string $role) => [
+                'role' => $role,
+                'label' => $label,
+                'locked' => $role === Offices::HEAD,
+                'permissions' => Role::findByName($role, 'web')->permissions->pluck('name'),
+            ])->values(),
+            'permissionLabels' => Offices::PERMISSIONS,
             'superAdmins' => User::role('super_admin')->orderBy('full_name')->get(['id', 'full_name', 'email']),
             'candidates' => User::where('status', 'active')
                 ->withoutRole('super_admin')
@@ -208,6 +225,30 @@ class SettingsController extends Controller
     }
 
     /**
+     * Save the Paystack keys. The secret key is encrypted and never sent back
+     * to the browser; leaving it empty keeps the one already saved.
+     */
+    public function updatePaystack(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'public_key' => ['nullable', 'string', 'max:200', 'regex:/^pk_(test|live)_/'],
+            'secret_key' => ['nullable', 'string', 'max:200', 'regex:/^sk_(test|live)_/'],
+            'password' => ['required', 'current_password'],
+        ], [
+            'public_key.regex' => 'A public key starts with pk_test_ or pk_live_.',
+            'secret_key.regex' => 'A secret key starts with sk_test_ or sk_live_.',
+        ]);
+
+        Settings::set('paystack_public', $validated['public_key'] ?? null);
+
+        if (! empty($validated['secret_key'])) {
+            Settings::set('paystack_secret', Crypt::encryptString($validated['secret_key']));
+        }
+
+        return back()->with('success', 'Payment keys saved.');
+    }
+
+    /**
      * Save the visitor pop-up. Changing the picture or asking to show it again
      * starts every visitor's count from zero.
      */
@@ -262,6 +303,25 @@ class SettingsController extends Controller
         ]));
 
         return back()->with('success', 'Message templates saved.');
+    }
+
+    /**
+     * Choose what each department office may do. The Head of Department keeps
+     * everything, so a department can never lock itself out.
+     */
+    public function updatePermissions(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'offices' => ['required', 'array'],
+            'offices.*' => ['array'],
+            'offices.*.*' => [Rule::in(Offices::permissions())],
+        ]);
+
+        foreach (array_diff(Offices::roles(), [Offices::HEAD]) as $office) {
+            Role::findByName($office, 'web')->syncPermissions($validated['offices'][$office] ?? []);
+        }
+
+        return back()->with('success', 'Permissions saved.');
     }
 
     /**

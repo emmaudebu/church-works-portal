@@ -32,6 +32,14 @@ class Attendance extends Model
     /**
      * @return BelongsTo<User, $this>
      */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

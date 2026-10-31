@@ -3,12 +3,14 @@
 use App\Models\Department;
 use App\Models\Post;
 use App\Models\User;
+use App\Notifications\PostPublished;
 use App\Support\CurrentDepartment;
 use App\Support\RichText;
 use Database\Seeders\DepartmentSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -299,4 +301,86 @@ test('only events have calendar files', function () {
     $post = Post::factory()->create(['department_id' => $this->technical->id]);
 
     $this->get(route('posts.calendar', $post))->assertNotFound();
+});
+
+function subscribe(User $user): void
+{
+    $user->updatePushSubscription('https://push.example.com/'.$user->id, 'key', 'token', 'aes128gcm');
+}
+
+test('publishing tells subscribers in the department only', function () {
+    Notification::fake();
+    subscribe($this->member);
+    subscribe($this->outsider);
+
+    $this->actingAs($this->admin)->post(route('admin.posts.store'), [...$this->payload, 'notify' => true]);
+
+    Notification::assertSentTo($this->member, PostPublished::class);
+    Notification::assertNotSentTo($this->outsider, PostPublished::class);
+});
+
+test('a church-wide post tells every subscriber', function () {
+    Notification::fake();
+    subscribe($this->member);
+    subscribe($this->outsider);
+
+    $this->actingAs($this->superAdmin)->post(route('admin.posts.store'), [...$this->payload, 'notify' => true]);
+
+    Notification::assertSentTo([$this->member, $this->outsider], PostPublished::class);
+});
+
+test('nothing is sent for drafts, when switched off, or to suspended members', function () {
+    Notification::fake();
+    subscribe($this->member);
+
+    $this->actingAs($this->admin)->post(route('admin.posts.store'), [...$this->payload, 'publish' => false, 'notify' => true]);
+    $this->actingAs($this->admin)->post(route('admin.posts.store'), [...$this->payload, 'notify' => false]);
+
+    $this->member->update(['status' => 'suspended']);
+    $this->actingAs($this->admin)->post(route('admin.posts.store'), [...$this->payload, 'notify' => true]);
+
+    Notification::assertNothingSent();
+});
+
+test('publishing a draft sends once and later edits send nothing', function () {
+    Notification::fake();
+    subscribe($this->member);
+    $post = Post::factory()->draft()->create(['department_id' => $this->technical->id]);
+
+    $this->actingAs($this->admin)->patch(route('admin.posts.update', $post), [...$this->payload, 'notify' => true]);
+    $this->actingAs($this->admin)->patch(route('admin.posts.update', $post), [...$this->payload, 'notify' => true]);
+
+    Notification::assertSentToTimes($this->member, PostPublished::class, 1);
+});
+
+test('the message links to the post and holds no script', function () {
+    $post = Post::factory()->create(['department_id' => $this->technical->id, 'title' => 'Hello', 'body' => '<p>Body</p>']);
+
+    $message = (new PostPublished($post))->toWebPush($this->member, null)->toArray();
+
+    expect($message['title'])->toBe('Hello')
+        ->and($message['body'])->toContain('Body')
+        ->and($message['data']['url'])->toBe('/posts/'.$post->id);
+});
+
+test('a member can switch notifications on and off', function () {
+    $data = ['endpoint' => 'https://push.example.com/abc', 'keys' => ['p256dh' => 'k', 'auth' => 'a']];
+
+    $this->actingAs($this->member)->post(route('push.store'), $data)->assertNoContent();
+
+    expect($this->member->pushSubscriptions()->count())->toBe(1);
+
+    $this->actingAs($this->member)->post(route('push.destroy'), ['endpoint' => $data['endpoint']])->assertNoContent();
+
+    expect($this->member->pushSubscriptions()->count())->toBe(0);
+});
+
+test('only https push addresses are accepted and a login is needed', function () {
+    $this->actingAs($this->member)->post(route('push.store'), [
+        'endpoint' => 'http://push.example.com/abc', 'keys' => ['p256dh' => 'k', 'auth' => 'a'],
+    ])->assertSessionHasErrors('endpoint');
+
+    $this->post('/logout');
+
+    $this->post(route('push.store'), [])->assertRedirect(route('login', absolute: false));
 });

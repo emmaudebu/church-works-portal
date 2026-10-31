@@ -43,6 +43,10 @@ The QR scanner needs camera access, which browsers only allow on `https` or `loc
 
 `npm run build` creates the service worker in `public/` and the manifest in `public/build/`. The service worker only stores the app's code, icons and the offline page, never member data. Serve `sw.js` with `Cache-Control: no-cache` so updates reach phones. Installing and offline support need `https`.
 
+## Push notifications
+
+Run `php artisan webpush:vapid` once to create the keys, and keep them: changing them signs every device out of notifications. Set `VAPID_SUBJECT` to a real `mailto:` address. Messages are queued, and `php artisan schedule:run` from cron sends them.
+
 ## Elections
 
 Votes are stored with a hash of the voter and position, keyed with `APP_KEY`. Do not change `APP_KEY` while an election is open: the app would no longer recognise who has voted.

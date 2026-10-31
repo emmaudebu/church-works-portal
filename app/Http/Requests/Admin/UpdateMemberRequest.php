@@ -20,8 +20,8 @@ class UpdateMemberRequest extends MemberRequest
         $member = $this->route('member');
 
         return [
-            ...MemberRules::personal($member),
-            ...MemberRules::church(),
+            ...MemberRules::personal($member, requireEmail: false),
+            ...MemberRules::church($this->integer('department_id') ?: $member->department_id),
             ...MemberRules::certificates($member, required: false),
             ...MemberRules::emergencyAndExtra(),
             ...($this->user()->hasRole('super_admin') ? MemberRules::department($member->department_id) : []),

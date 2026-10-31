@@ -28,6 +28,7 @@ class PostRequest extends FormRequest
             'event_date' => ['nullable', 'required_if:type,event', 'date'],
             'venue' => ['nullable', 'string', 'max:255'],
             'publish' => ['boolean'],
+            'notify' => ['boolean'],
         ];
     }
 

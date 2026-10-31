@@ -18,6 +18,18 @@ type RecurringService = {
     closes: string;
 };
 type Person = { id: number; full_name: string };
+type OfficeRow = {
+    role: string;
+    label: string;
+    locked: boolean;
+    permissions: string[];
+};
+type PaystackSettings = {
+    public_key: string | null;
+    configured: boolean;
+    secret_hint: string | null;
+    webhook_url: string;
+};
 
 const COLOR_LABELS = {
     primary_900: 'Deep red (sidebar, footer)',
@@ -26,13 +38,6 @@ const COLOR_LABELS = {
     gold_500: 'Gold (accents)',
 };
 
-const PERMISSIONS: [string, boolean, boolean, boolean][] = [
-    ['View own dashboard, QR and attendance; vote', true, true, true],
-    ['Manage members, attendance and reports', true, true, false],
-    ['Manage posts and elections', true, true, false],
-    ['See every department', true, false, false],
-    ['Departments and Settings', true, false, false],
-];
 
 const DAYS = [
     'Sunday',
@@ -1010,6 +1015,206 @@ function PopupForm({ popup }: { popup: SitePopupData }) {
     );
 }
 
+function PaystackForm({ paystack }: { paystack: PaystackSettings }) {
+    const form = useForm({
+        public_key: paystack.public_key ?? '',
+        secret_key: '',
+        password: '',
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.post(route('admin.settings.paystack'), {
+            preserveScroll: true,
+            onFinish: () => form.reset('secret_key', 'password'),
+        });
+    };
+
+    return (
+        <Panel
+            title="Payment keys"
+            description="Your Paystack keys, from the Paystack dashboard under Settings, API Keys and Webhooks."
+        >
+            <form onSubmit={submit} className="space-y-4">
+                <p className="rounded-lg bg-gold-50 p-3 text-sm">
+                    {paystack.configured
+                        ? `Online payments are on. Secret key ending ${paystack.secret_hint}.`
+                        : 'Online payments are off until a secret key is saved.'}
+                </p>
+                <div>
+                    <InputLabel htmlFor="public_key" value="Public key" />
+                    <TextInput
+                        id="public_key"
+                        value={form.data.public_key}
+                        placeholder="pk_test_..."
+                        onChange={(e) =>
+                            form.setData('public_key', e.target.value)
+                        }
+                        className="mt-1 block w-full"
+                    />
+                    <InputError
+                        message={form.errors.public_key}
+                        className="mt-2"
+                    />
+                </div>
+                <div>
+                    <InputLabel
+                        htmlFor="secret_key"
+                        value="Secret key (leave empty to keep the saved one)"
+                    />
+                    <TextInput
+                        id="secret_key"
+                        type="password"
+                        autoComplete="off"
+                        value={form.data.secret_key}
+                        placeholder="sk_test_..."
+                        onChange={(e) =>
+                            form.setData('secret_key', e.target.value)
+                        }
+                        className="mt-1 block w-full"
+                    />
+                    <InputError
+                        message={form.errors.secret_key}
+                        className="mt-2"
+                    />
+                </div>
+                <div>
+                    <InputLabel
+                        htmlFor="paystack_password"
+                        value="Your password, to confirm"
+                    />
+                    <TextInput
+                        id="paystack_password"
+                        type="password"
+                        autoComplete="current-password"
+                        value={form.data.password}
+                        onChange={(e) =>
+                            form.setData('password', e.target.value)
+                        }
+                        required
+                        className="mt-1 block w-full"
+                    />
+                    <InputError
+                        message={form.errors.password}
+                        className="mt-2"
+                    />
+                </div>
+                <p className="break-all text-sm text-neutral-600">
+                    Webhook address for Paystack: {paystack.webhook_url}
+                </p>
+                <PrimaryButton disabled={form.processing}>Save</PrimaryButton>
+            </form>
+        </Panel>
+    );
+}
+
+function PermissionsForm({
+    offices,
+    labels,
+}: {
+    offices: OfficeRow[];
+    labels: Record<string, string>;
+}) {
+    const form = useForm({
+        offices: Object.fromEntries(
+            offices.map((office) => [office.role, office.permissions]),
+        ),
+    });
+
+    const toggle = (role: string, permission: string) => {
+        const current = form.data.offices[role];
+
+        form.setData('offices', {
+            ...form.data.offices,
+            [role]: current.includes(permission)
+                ? current.filter((item) => item !== permission)
+                : [...current, permission],
+        });
+    };
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.put(route('admin.settings.permissions'), {
+            preserveScroll: true,
+        });
+    };
+
+    return (
+        <Panel
+            title="Office permissions"
+            description="Tick what each department office may do. The Head of Department always has everything. Super admins can do everything."
+        >
+            <form onSubmit={submit}>
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px] text-left text-sm">
+                        <thead>
+                            <tr className="border-b border-neutral-200 text-neutral-600">
+                                <th scope="col" className="py-2 pr-2 font-medium">
+                                    Permission
+                                </th>
+                                {offices.map((office) => (
+                                    <th
+                                        key={office.role}
+                                        scope="col"
+                                        className="w-24 p-2 text-center text-xs font-medium"
+                                    >
+                                        {office.label}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {Object.entries(labels).map(([permission, label]) => (
+                                <tr
+                                    key={permission}
+                                    className="border-b border-neutral-200"
+                                >
+                                    <th
+                                        scope="row"
+                                        className="py-2 pr-2 font-normal"
+                                    >
+                                        {label}
+                                    </th>
+                                    {offices.map((office) => (
+                                        <td
+                                            key={office.role}
+                                            className="p-2 text-center"
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                aria-label={`${office.label}: ${label}`}
+                                                disabled={office.locked}
+                                                checked={
+                                                    office.locked ||
+                                                    form.data.offices[
+                                                        office.role
+                                                    ].includes(permission)
+                                                }
+                                                onChange={() =>
+                                                    toggle(
+                                                        office.role,
+                                                        permission,
+                                                    )
+                                                }
+                                                className="rounded border-neutral-200 text-primary-700 focus:ring-primary-700 disabled:opacity-50"
+                                            />
+                                        </td>
+                                    ))}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+                <PrimaryButton disabled={form.processing} className="mt-4">
+                    Save permissions
+                </PrimaryButton>
+            </form>
+        </Panel>
+    );
+}
+
 function RolesPanel({
     superAdmins,
     candidates,
@@ -1033,44 +1238,10 @@ function RolesPanel({
 
     return (
         <Panel
-            title="Roles and permissions"
+            title="Super admins"
             description="Department admins are assigned on the Departments page."
         >
-            <table className="w-full text-left text-sm">
-                <thead>
-                    <tr className="border-b border-neutral-200 text-neutral-600">
-                        <th scope="col" className="py-2 pr-2 font-medium">
-                            Can
-                        </th>
-                        <th scope="col" className="p-2 text-center font-medium">
-                            Super admin
-                        </th>
-                        <th scope="col" className="p-2 text-center font-medium">
-                            Dept admin
-                        </th>
-                        <th scope="col" className="p-2 text-center font-medium">
-                            Member
-                        </th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {PERMISSIONS.map(([label, ...roles]) => (
-                        <tr key={label} className="border-b border-neutral-200">
-                            <td className="py-2 pr-2">{label}</td>
-                            {roles.map((allowed, index) => (
-                                <td key={index} className="p-2 text-center">
-                                    {allowed ? 'Yes' : 'No'}
-                                </td>
-                            ))}
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-
-            <h3 className="mt-6 font-sans text-sm font-semibold">
-                Super admins
-            </h3>
-            <ul className="mt-2 divide-y divide-neutral-200 text-sm">
+            <ul className="divide-y divide-neutral-200 text-sm">
                 {superAdmins.map((admin) => (
                     <li
                         key={admin.id}
@@ -1217,6 +1388,9 @@ export default function Settings({
     whatsapp,
     popup,
     home,
+    paystack,
+    offices,
+    permissionLabels,
     superAdmins,
     candidates,
     currentUserId,
@@ -1227,6 +1401,9 @@ export default function Settings({
     whatsapp: { greeting: string; temp_password: string };
     popup: SitePopupData;
     home: HomeContent;
+    paystack: PaystackSettings;
+    offices: OfficeRow[];
+    permissionLabels: Record<string, string>;
     superAdmins: (Person & { email: string | null })[];
     candidates: Person[];
     currentUserId: number;
@@ -1244,20 +1421,14 @@ export default function Settings({
                 <HomepageForm home={home} />
                 <PopupForm popup={popup} />
                 <ServicesForm services={services} />
+                <PermissionsForm offices={offices} labels={permissionLabels} />
                 <RolesPanel
                     superAdmins={superAdmins}
                     candidates={candidates}
                     currentUserId={currentUserId}
                 />
                 <WhatsappForm whatsapp={whatsapp} />
-                <Panel
-                    title="Payment keys"
-                    description="Paystack keys arrive with payments in phase 2."
-                >
-                    <p className="text-sm text-neutral-600">
-                        Nothing to set up yet.
-                    </p>
-                </Panel>
+                <PaystackForm paystack={paystack} />
             </div>
         </AdminLayout>
     );

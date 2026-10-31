@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Department;
 use App\Support\CurrentDepartment;
+use App\Support\Offices;
 use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -44,7 +45,12 @@ class HandleInertiaRequests extends Middleware
                     'status' => $request->user()->status,
                     'roles' => $request->user()->getRoleNames(),
                     'is_admin' => $request->user()->isAdmin(),
+                    'office' => $request->user()->office(),
+                    'permissions' => $request->user()->hasRole('super_admin')
+                        ? Offices::permissions()
+                        : $request->user()->getAllPermissions()->pluck('name'),
                     'unit' => $request->user()->unit,
+                    'department_id' => $request->user()->department_id,
                     'department' => $request->user()->department?->name,
                     'photo_url' => $request->user()->photoUrl(),
                     'must_change_password' => $request->user()->must_change_password,

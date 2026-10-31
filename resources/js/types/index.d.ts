@@ -7,7 +7,10 @@ export interface User {
     status: 'pending' | 'active' | 'suspended';
     roles: string[];
     is_admin: boolean;
+    office: string | null;
+    permissions: string[];
     unit: string | null;
+    department_id: number | null;
     department: string | null;
     photo_url: string | null;
     must_change_password: boolean;
@@ -52,6 +55,12 @@ export interface HomeContent {
         image: string;
         small_image: string;
     };
+}
+
+export interface GalleryImage {
+    id: number;
+    caption: string | null;
+    url: string;
 }
 
 export interface SitePopupData {

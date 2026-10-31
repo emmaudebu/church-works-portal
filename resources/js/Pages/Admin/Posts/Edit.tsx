@@ -38,6 +38,7 @@ export default function Edit({
         event_date: string;
         image: File | null;
         publish: boolean;
+        notify: boolean;
     }>({
         _method: post ? 'patch' : 'post',
         type: post?.type ?? 'news',
@@ -47,6 +48,7 @@ export default function Edit({
         event_date: post?.event_date ?? '',
         image: null,
         publish: post?.published ?? true,
+        notify: true,
     });
 
     const chooseImage = (e: ChangeEvent<HTMLInputElement>) => {
@@ -211,13 +213,17 @@ export default function Edit({
                         />
                         Publish
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-neutral-600">
+                    <label className="flex items-center gap-2 text-sm">
                         <input
                             type="checkbox"
-                            disabled
-                            className="rounded border-neutral-200"
+                            checked={data.notify}
+                            disabled={!data.publish || post?.published}
+                            onChange={(e) =>
+                                setData('notify', e.target.checked)
+                            }
+                            className="rounded border-neutral-200 text-primary-700 focus:ring-primary-700 disabled:opacity-50"
                         />
-                        Send push notification (coming in phase 2)
+                        Send push notification
                     </label>
                 </div>
 

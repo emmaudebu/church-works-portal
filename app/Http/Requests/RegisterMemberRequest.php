@@ -15,7 +15,7 @@ class RegisterMemberRequest extends MemberRequest
     {
         $steps = [
             1 => MemberRules::personal(),
-            2 => [...MemberRules::department(), ...MemberRules::church(), ...MemberRules::certificates()],
+            2 => [...MemberRules::department(), ...MemberRules::church($this->integer('department_id') ?: null), ...MemberRules::certificates()],
             3 => MemberRules::emergencyAndExtra(),
         ];
 

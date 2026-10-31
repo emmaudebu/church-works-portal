@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Unit;
 use App\Models\User;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -16,14 +17,14 @@ class MemberRules
     /**
      * @return array<string, array<mixed>>
      */
-    public static function personal(?User $ignore = null): array
+    public static function personal(?User $ignore = null, bool $requireEmail = true): array
     {
         return [
             'full_name' => ['required', 'string', 'max:255'],
             'gender' => ['required', Rule::in(['male', 'female'])],
             'date_of_birth' => ['required', 'date', 'before:today'],
             'phone' => ['required', 'string', self::PHONE_FORMAT, Rule::unique(User::class)->ignore($ignore)],
-            'email' => ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($ignore)],
+            'email' => [$requireEmail ? 'required' : 'nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($ignore)],
             'address' => ['required', 'string', 'max:255'],
         ];
     }
@@ -31,10 +32,12 @@ class MemberRules
     /**
      * @return array<string, array<mixed>>
      */
-    public static function church(): array
+    public static function church(?int $departmentId = null): array
     {
+        $units = Unit::where('department_id', $departmentId)->pluck('name');
+
         return [
-            'unit' => ['required', 'string', 'max:100'],
+            'unit' => ['required', 'string', 'max:100', ...($units->isNotEmpty() ? [Rule::in($units->all())] : [])],
             'date_joined' => ['nullable', 'date', 'before_or_equal:today'],
             'foundation_class_done' => ['boolean'],
             'wofbi_done' => ['boolean'],

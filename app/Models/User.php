@@ -4,6 +4,7 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\CurrentDepartment;
+use App\Support\Offices;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable([
@@ -27,7 +29,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasRoles, Notifiable;
+    use HasFactory, HasPushSubscriptions, HasRoles, Notifiable;
 
     /**
      * Give every new user a random token for their QR code.
@@ -106,7 +108,7 @@ class User extends Authenticatable
     public function canAccessDepartment(int $departmentId): bool
     {
         return $this->hasRole('super_admin')
-            || ($this->hasRole('dept_admin') && $this->department_id === $departmentId);
+            || ($this->isOfficer() && $this->department_id === $departmentId);
     }
 
     /**
@@ -118,6 +120,14 @@ class User extends Authenticatable
     }
 
     /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
      * Whether this admin may see someone's record.
      */
     public function canView(User $member): bool
@@ -126,15 +136,15 @@ class User extends Authenticatable
             return true;
         }
 
-        return $this->hasRole('dept_admin')
+        return $this->isOfficer()
             && $this->department_id !== null
             && $this->department_id === $member->department_id
             && ! $member->hasRole('super_admin');
     }
 
     /**
-     * Whether this admin may change someone's record. Department admins can only
-     * act on members, so they can not suspend or take over a fellow admin.
+     * Whether this admin may change someone's record. Officers can only act on
+     * ordinary members, so they can not suspend or take over a fellow officer.
      */
     public function canManage(User $member): bool
     {
@@ -143,7 +153,7 @@ class User extends Authenticatable
         }
 
         return $this->hasRole('super_admin')
-            || ($this->canView($member) && ! $member->hasRole('dept_admin'));
+            || ($this->canView($member) && $this->canDo('manage_members') && ! $member->isOfficer());
     }
 
     public function photoUrl(): ?string
@@ -172,6 +182,30 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return $this->hasAnyRole(['super_admin', 'dept_admin']);
+        return $this->hasRole('super_admin') || $this->isOfficer();
+    }
+
+    /**
+     * Whether this person holds a department office.
+     */
+    public function isOfficer(): bool
+    {
+        return $this->hasAnyRole(Offices::roles());
+    }
+
+    /**
+     * The label of the office held, if any.
+     */
+    public function office(): ?string
+    {
+        return Offices::LABELS[$this->getRoleNames()->first(fn (string $role) => isset(Offices::LABELS[$role]))] ?? null;
+    }
+
+    /**
+     * Whether this person may do something. Super admins can do everything.
+     */
+    public function canDo(string $permission): bool
+    {
+        return $this->hasRole('super_admin') || $this->checkPermissionTo($permission);
     }
 }

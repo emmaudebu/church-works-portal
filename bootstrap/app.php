@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureOffice;
 use App\Http\Middleware\EnsurePasswordIsChanged;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -24,8 +25,12 @@ return Application::configure(basePath: dirname(__DIR__))
             AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // Paystack's server can't send a CSRF token; its signature is checked instead.
+        $middleware->preventRequestForgery(except: ['paystack/webhook']);
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
+            'office' => EnsureOffice::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

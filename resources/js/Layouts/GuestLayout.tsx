@@ -1,7 +1,8 @@
 import Logo from '@/Components/Logo';
 import Embers from '@/Components/Site/Embers';
 import { PageProps } from '@/types';
-import { usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
+import { Home } from 'lucide-react';
 import { PropsWithChildren } from 'react';
 
 export default function Guest({ children }: PropsWithChildren) {
@@ -28,6 +29,13 @@ export default function Guest({ children }: PropsWithChildren) {
 
             <main className="flex min-h-screen flex-col items-center justify-center px-4 py-10 lg:px-8">
                 <div className="w-full max-w-md animate-page-in">
+                    <Link
+                        href={route('home')}
+                        className="mb-6 flex w-fit items-center gap-2 rounded-lg text-sm font-medium text-neutral-600 transition hover:text-primary-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                    >
+                        <Home size={20} strokeWidth={1.75} aria-hidden="true" />
+                        Back to home
+                    </Link>
                     <Logo className="mb-8 lg:hidden" />
                     {children}
                 </div>

@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Election;
 use App\Models\Post;
 use App\Models\Service;
+use App\Models\User;
 use App\Support\AttendanceStats;
 use App\Support\Ballot;
+use App\Support\Dues;
 use App\Support\ServiceGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -37,12 +39,40 @@ class AttendanceController extends Controller
             ->first();
 
         return Inertia::render('Member/Home', [
+            'profile' => $this->profileSummary($user),
+            'upcoming' => Service::whereIn('department_id', $departments)
+                ->whereDate('date', '>=', today())
+                ->where('closes_at', '>=', now())
+                ->orderBy('opens_at')
+                ->limit(4)
+                ->get()
+                ->map(fn (Service $service) => [
+                    'id' => $service->id,
+                    'title' => $service->title,
+                    'date_label' => $service->date->format('D j M'),
+                    'time' => $service->opens_at->format('g:i A'),
+                ]),
+            'recentCheckIns' => $user->attendance()
+                ->with('service:id,title,date')
+                ->latest('checked_in_at')
+                ->limit(4)
+                ->get()
+                ->map(fn ($row) => [
+                    'id' => $row->id,
+                    'title' => $row->service->title,
+                    'date_label' => $row->service->date->format('D j M'),
+                    'time' => $row->checked_in_at->format('g:i A'),
+                ]),
             'month' => $month,
             'nextService' => $next ? [
                 'title' => $next->title,
                 'date_label' => $next->date->format('l j F'),
                 'time' => $next->opens_at->format('g:i A'),
             ] : null,
+            'dues' => [
+                'count' => ($owing = Dues::owing($user))->count(),
+                'total' => $owing->sum('amount'),
+            ],
             'openElection' => Election::where('department_id', $user->department_id)
                 ->where('starts_at', '<=', now())
                 ->where('ends_at', '>=', now())
@@ -64,6 +94,35 @@ class AttendanceController extends Controller
                 ->get()
                 ->map->toCard(),
         ]);
+    }
+
+    /**
+     * How complete a member's details are, and what is still missing.
+     *
+     * @return array<string, mixed>
+     */
+    private function profileSummary(User $user): array
+    {
+        $profile = $user->profile;
+
+        $checks = [
+            'Passport photo' => $user->photo,
+            'Email' => $user->email,
+            'Home address' => $user->address,
+            'Date of birth' => $user->date_of_birth,
+            'Unit' => $user->unit,
+            'Next of kin' => $profile?->next_of_kin_name,
+            'Occupation' => $profile?->occupation,
+            'Technical skills' => $profile?->technical_skills,
+        ];
+
+        $missing = collect($checks)->filter(fn ($value) => blank($value))->keys();
+
+        return [
+            'member_id' => $user->member_id,
+            'percent' => (int) round((count($checks) - $missing->count()) / count($checks) * 100),
+            'missing' => $missing->values(),
+        ];
     }
 
     /**

@@ -19,6 +19,7 @@ beforeEach(function () {
         'gender' => 'female',
         'date_of_birth' => '1995-04-12',
         'phone' => '+234 0801 234 5678',
+        'email' => 'new.member@example.com',
         'address' => '12 Faith Avenue',
         'department_id' => Department::firstWhere('slug', 'technical-unit')->id,
         'unit' => 'Sound',
@@ -159,4 +160,13 @@ test('a file attached before changing the answer to no is not kept', function ()
         ->assertSessionHasNoErrors();
 
     expect(User::firstWhere('phone', '+2348012345678')->foundation_certificate)->toBeNull();
+});
+
+test('an email is required so a password can be reset', function () {
+    $this->post('/register/check?step=1', ['full_name' => 'A', 'email' => ''])
+        ->assertSessionHasErrors('email');
+
+    $this->post('/register', [...$this->registration, 'email' => ''])->assertSessionHasErrors('email');
+
+    expect(User::count())->toBe(0);
 });

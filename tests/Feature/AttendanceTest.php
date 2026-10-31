@@ -145,6 +145,30 @@ test('manual check-in follows the same member rules', function (string $status, 
     expect(Attendance::count())->toBe(0);
 })->with([['suspended', 'suspended'], ['pending', 'invalid']]);
 
+test('a department head can mark a member with no id card and it shows who did', function () {
+    $this->actingAs($this->admin)
+        ->postJson(route('admin.scanner.manual', $this->service), ['user_id' => $this->member->id])
+        ->assertJsonPath('status', 'present');
+
+    $this->actingAs($this->admin)->get(route('admin.members.show', $this->member))
+        ->assertInertia(fn (Assert $page) => $page->where('attendance.recent.0.marked_by', $this->admin->full_name));
+});
+
+test('nobody can be marked present at a service that has not happened', function () {
+    $service = Service::factory()->create([
+        'department_id' => $this->technical->id,
+        'date' => today()->addDays(3),
+        'opens_at' => now()->addDays(3),
+        'closes_at' => now()->addDays(3)->addHour(),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->postJson(route('admin.scanner.manual', $service), ['user_id' => $this->member->id])
+        ->assertJsonPath('status', 'closed');
+
+    expect(Attendance::count())->toBe(0);
+});
+
 test('manual check-in can not reach another department', function () {
     $this->actingAs($this->admin)
         ->postJson(route('admin.scanner.manual', $this->service), ['user_id' => $this->outsider->id])
@@ -418,16 +442,21 @@ test('a past service reopened by an admin is not shown as the next service', fun
     $past = Service::factory()->finished(3)->create(['department_id' => $this->technical->id]);
     $past->open();
 
-    $next = Service::factory()->create([
-        'department_id' => $this->technical->id,
-        'title' => 'Coming up',
-        'date' => today()->addDay(),
-        'opens_at' => now()->addDay(),
-        'closes_at' => now()->addDay()->addHour(),
-    ]);
+    $past->update(['title' => 'Reopened past service']);
 
     $this->actingAs($this->member)->get('/home')
-        ->assertInertia(fn (Assert $page) => $page->where('nextService.title', $next->title));
+        ->assertInertia(fn (Assert $page) => $page->whereNot('nextService.title', 'Reopened past service'));
+});
+
+test('the member home shows profile progress and recent check-ins', function () {
+    $this->member->update(['photo' => null]);
+    heldService($this, 3, [$this->member]);
+
+    $this->actingAs($this->member)->get('/home')->assertInertia(fn (Assert $page) => $page
+        ->where('profile.member_id', $this->member->member_id)
+        ->where('profile.missing', fn ($missing) => collect($missing)->contains('Passport photo'))
+        ->has('recentCheckIns', 1)
+        ->has('upcoming'));
 });
 
 test('the member home shows this month and the next service', function () {

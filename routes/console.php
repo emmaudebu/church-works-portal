@@ -16,3 +16,6 @@ Artisan::command('services:generate', function () {
 })->purpose('Create the upcoming Sunday and Wednesday services');
 
 Schedule::command('services:generate')->daily();
+
+// Sends queued push notifications on hosts that can't keep a worker running.
+Schedule::command('queue:work --stop-when-empty --max-time=50')->everyMinute()->withoutOverlapping();

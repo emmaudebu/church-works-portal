@@ -24,6 +24,7 @@ class ProfileController extends Controller
         return Inertia::render('Profile/Edit', [
             'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
             'status' => session('status'),
+            'vapidPublicKey' => config('webpush.vapid.public_key'),
             'member' => $request->user()->hasRole('super_admin') ? null : [
                 ...$request->user()->only([
                     'full_name', 'gender', 'phone', 'email', 'address', 'unit',
@@ -33,6 +34,7 @@ class ProfileController extends Controller
                 'date_joined' => $request->user()->date_joined?->toDateString(),
                 'profile' => $request->user()->profile,
                 'certificate_urls' => Certificates::urls($request->user()),
+                'units' => $request->user()->department?->units->pluck('name') ?? [],
             ],
         ]);
     }

@@ -364,7 +364,7 @@ export default function Scanner({
                             htmlFor="member-search"
                             className="text-xs text-silver-300"
                         >
-                            Search member
+                            No ID card? Search member
                         </label>
                         <div className="relative mt-1">
                             <Search

@@ -8,6 +8,7 @@ use App\Models\Department;
 use App\Models\Post;
 use App\Support\CurrentDepartment;
 use App\Support\PostImage;
+use App\Support\PostNotifier;
 use App\Support\RichText;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -69,12 +70,14 @@ class PostController extends Controller
             $data['image'] = PostImage::store($request->file('image'));
         }
 
-        Post::create([
+        $post = Post::create([
             ...$data,
             'department_id' => $departmentId,
             'author_id' => $admin->id,
             'published_at' => $request->boolean('publish') ? now() : null,
         ]);
+
+        $this->notify($request, $post, wasPublished: false);
 
         return to_route('admin.posts')->with('success', $request->boolean('publish') ? 'Post published.' : 'Draft saved.');
     }
@@ -112,10 +115,14 @@ class PostController extends Controller
             $data['image'] = PostImage::store($request->file('image'), $post->image);
         }
 
+        $wasPublished = $post->isPublished();
+
         $post->update([
             ...$data,
             'published_at' => $request->boolean('publish') ? ($post->published_at ?? now()) : null,
         ]);
+
+        $this->notify($request, $post, $wasPublished);
 
         return to_route('admin.posts')->with('success', 'Post saved.');
     }
@@ -141,7 +148,7 @@ class PostController extends Controller
      */
     private function attributes(PostRequest $request): array
     {
-        $data = Arr::except($request->validated(), ['image', 'publish']);
+        $data = Arr::except($request->validated(), ['image', 'publish', 'notify']);
 
         return [
             ...$data,
@@ -149,6 +156,16 @@ class PostController extends Controller
             'event_date' => $data['type'] === 'event' ? $data['event_date'] : null,
             'venue' => $data['type'] === 'event' ? ($data['venue'] ?? null) : null,
         ];
+    }
+
+    /**
+     * Only the moment a post goes live is news; later edits send nothing.
+     */
+    private function notify(PostRequest $request, Post $post, bool $wasPublished): void
+    {
+        if (! $wasPublished && $post->isPublished() && $request->boolean('notify')) {
+            PostNotifier::send($post);
+        }
     }
 
     private function audience(Request $request): string

@@ -10,6 +10,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Models\Vote;
 use App\Support\Ballot;
+use App\Support\Offices;
 use App\Support\ServiceGenerator;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -44,7 +45,7 @@ class DatabaseSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'deptadmin@covenantworkforce.test'],
             ['department_id' => $technicalUnit->id, 'full_name' => 'Grace Department', 'phone' => '+2348000000001', 'status' => 'active', 'password' => 'password'],
-        )->assignRole('dept_admin');
+        )->assignRole(Offices::HEAD);
 
         User::updateOrCreate(
             ['email' => 'member@covenantworkforce.test'],
@@ -113,7 +114,7 @@ class DatabaseSeeder extends Seeder
 
     private function seedSamplePosts(Department $department): void
     {
-        $author = User::role('dept_admin')->first();
+        $author = User::role(Offices::HEAD)->first();
 
         foreach ([
             ['news', 'New sound desk installed', 'The main auditorium now has a new digital sound desk. Training starts soon.', null, null],

@@ -2,21 +2,28 @@ import Badge from '@/Components/Badge';
 import DepartmentCard from '@/Components/DepartmentCard';
 import PostCard from '@/Components/PostCard';
 import CountUp from '@/Components/Site/CountUp';
+import Gallery from '@/Components/Site/Gallery';
 import PageHero from '@/Components/Site/PageHero';
 import SectionHeading from '@/Components/Site/SectionHeading';
 import PublicLayout from '@/Layouts/PublicLayout';
-import { Department as DepartmentData, PostCard as PostCardData } from '@/types';
+import {
+    Department as DepartmentData,
+    GalleryImage,
+    PostCard as PostCardData,
+} from '@/types';
 import { Head, Link } from '@inertiajs/react';
 
 export default function Department({
     department,
     units,
+    gallery,
     events,
     news,
     others,
 }: {
     department: DepartmentData;
     units: string[];
+    gallery: GalleryImage[];
     events: PostCardData[];
     news: PostCardData[];
     others: DepartmentData[];
@@ -97,6 +104,17 @@ export default function Department({
                     )}
                 </aside>
             </section>
+
+            {gallery.length > 0 && (
+                <section className="mx-auto max-w-7xl px-4 pb-16 md:px-8">
+                    <SectionHeading
+                        eyebrow="Moments"
+                        title="Our"
+                        accent="Gallery"
+                    />
+                    <Gallery images={gallery} />
+                </section>
+            )}
 
             {events.length > 0 && (
                 <section className="bg-neutral-50 py-16">
