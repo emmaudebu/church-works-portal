@@ -14,6 +14,8 @@ export type BioData = {
     date_joined: string;
     foundation_class_done: boolean;
     wofbi_done: boolean;
+    foundation_certificate: File | null;
+    wofbi_certificate: File | null;
     next_of_kin_name: string;
     next_of_kin_relationship: string;
     next_of_kin_phone: string;
@@ -135,12 +137,18 @@ function Choice({
 function YesNo({
     form,
     name,
+    certificate,
+    certificateUrl,
     label,
 }: {
     form: BioFormProps;
     name: 'foundation_class_done' | 'wofbi_done';
+    certificate: 'foundation_certificate' | 'wofbi_certificate';
+    certificateUrl?: string | null;
     label: string;
 }) {
+    const id = `${certificate}-input`;
+
     return (
         <fieldset>
             <legend className="block text-sm font-medium text-neutral-900">
@@ -163,6 +171,42 @@ function YesNo({
                     </label>
                 ))}
             </div>
+
+            {form.data[name] && (
+                <div className="mt-3 rounded-lg bg-gold-50 p-3">
+                    <label htmlFor={id} className="block text-sm font-medium">
+                        Upload your certificate (PDF or photo)
+                    </label>
+                    {certificateUrl && (
+                        <a
+                            href={certificateUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 block text-sm text-primary-700 underline"
+                        >
+                            View the certificate on file
+                        </a>
+                    )}
+                    <input
+                        id={id}
+                        type="file"
+                        accept="application/pdf,image/jpeg,image/png,image/webp"
+                        onChange={(e) =>
+                            form.set(certificate, e.target.files?.[0] ?? null)
+                        }
+                        className="mt-1 block w-full text-sm"
+                    />
+                    {form.data[certificate] && (
+                        <p className="mt-1 text-sm text-success">
+                            Selected: {form.data[certificate].name}
+                        </p>
+                    )}
+                    <InputError
+                        message={form.errors[certificate]}
+                        className="mt-2"
+                    />
+                </div>
+            )}
         </fieldset>
     );
 }
@@ -289,7 +333,13 @@ export function PersonalFields({ form }: { form: BioFormProps }) {
     );
 }
 
-export function ChurchFields({ form }: { form: BioFormProps }) {
+export function ChurchFields({
+    form,
+    certificateUrls,
+}: {
+    form: BioFormProps;
+    certificateUrls?: { foundation: string | null; wofbi: string | null };
+}) {
     return (
         <div className="space-y-4">
             <Field id="unit" label="Unit" error={form.errors.unit}>
@@ -320,11 +370,15 @@ export function ChurchFields({ form }: { form: BioFormProps }) {
             <YesNo
                 form={form}
                 name="foundation_class_done"
+                certificate="foundation_certificate"
+                certificateUrl={certificateUrls?.foundation}
                 label="Foundation class completed"
             />
             <YesNo
                 form={form}
                 name="wofbi_done"
+                certificate="wofbi_certificate"
+                certificateUrl={certificateUrls?.wofbi}
                 label="Word of Faith Bible Institute (WOFBI) completed"
             />
         </div>
@@ -404,6 +458,8 @@ export function bioDataFrom(member: {
         date_joined: member.date_joined ?? '',
         foundation_class_done: member.foundation_class_done,
         wofbi_done: member.wofbi_done,
+        foundation_certificate: null,
+        wofbi_certificate: null,
         next_of_kin_name: member.profile?.next_of_kin_name ?? '',
         next_of_kin_relationship: member.profile?.next_of_kin_relationship ?? '',
         next_of_kin_phone: member.profile?.next_of_kin_phone ?? '+234',

@@ -21,12 +21,55 @@ export interface Department {
     description: string | null;
     status: 'active' | 'coming_soon';
     members_count: number;
+    about: string | null;
+    image_url: string;
 }
 
 export interface DepartmentContext {
     current_id: number | null;
     current_name: string | null;
     options: Pick<Department, 'id' | 'name'>[] | null;
+}
+
+export interface HomeSlide {
+    id: string;
+    image: string;
+    label: string;
+    title: string;
+    accent: string;
+    text: string;
+}
+
+export interface HomeContent {
+    slides: HomeSlide[];
+    welcome: {
+        eyebrow: string;
+        title: string;
+        accent: string;
+        text: string;
+        button_label: string;
+        button_link: string;
+        image: string;
+        small_image: string;
+    };
+}
+
+export interface SitePopupData {
+    enabled: boolean;
+    image_url: string;
+    link: string | null;
+    alt: string;
+    frequency: 'every_page' | 'every_visit' | 'daily';
+    max_views: number | null;
+    transition: 'fade' | 'zoom' | 'slide-up' | 'slide-down' | 'bounce' | 'flip';
+    delay: number;
+    version: number;
+}
+
+export interface Branding {
+    church_name: string;
+    logo_light_url: string;
+    logo_dark_url: string;
 }
 
 export type MemberStatus = User['status'];
@@ -91,6 +134,7 @@ export interface MemberRecord {
     status: MemberStatus;
     suspension_reason: string | null;
     photo_url: string | null;
+    certificate_urls: { foundation: string | null; wofbi: string | null };
     profile: MemberProfile | null;
 }
 
@@ -100,7 +144,7 @@ export interface PostCard {
     title: string;
     venue: string | null;
     excerpt: string;
-    image_url: string | null;
+    image_url: string;
     day: string;
     month: string;
     date: string;
@@ -137,6 +181,9 @@ export type PageProps<
         user: User;
     };
     departmentContext: DepartmentContext | null;
+    branding: Branding;
+    popup: SitePopupData | null;
+    whatsappTemplates: { greeting: string; temp_password: string } | null;
     flash: {
         success: string | null;
         temp_password: string | null;

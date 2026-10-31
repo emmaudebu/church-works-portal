@@ -25,6 +25,25 @@ function DepartmentRow({
         user_id: '',
     });
 
+    const page = useForm<{
+        description: string;
+        about: string;
+        image: File | null;
+    }>({
+        description: department.description ?? '',
+        about: department.about ?? '',
+        image: null,
+    });
+
+    const savePage: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        page.post(route('admin.departments.page', department.id), {
+            forceFormData: true,
+            preserveScroll: true,
+        });
+    };
+
     const assign: FormEventHandler = (e) => {
         e.preventDefault();
 
@@ -66,6 +85,72 @@ function DepartmentRow({
                     {active ? 'Set to Coming Soon' : 'Set to Active'}
                 </SecondaryButton>
             </div>
+
+            <form
+                onSubmit={savePage}
+                className="mt-5 space-y-3 border-t border-neutral-200 pt-4"
+            >
+                <h3 className="font-sans text-sm font-semibold">
+                    Public page
+                </h3>
+                <div className="flex flex-wrap items-center gap-3">
+                    <img
+                        src={department.image_url}
+                        alt=""
+                        className="h-16 w-28 rounded-lg object-cover"
+                    />
+                    <label className="min-w-0 flex-1 basis-48 text-sm font-medium">
+                        Change picture
+                        <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            onChange={(e) =>
+                                page.setData(
+                                    'image',
+                                    e.target.files?.[0] ?? null,
+                                )
+                            }
+                            className="mt-1 block w-full text-sm font-normal"
+                        />
+                    </label>
+                </div>
+                <InputError message={page.errors.image} />
+                <div>
+                    <InputLabel
+                        htmlFor={`description-${department.id}`}
+                        value="Short description"
+                    />
+                    <input
+                        id={`description-${department.id}`}
+                        value={page.data.description}
+                        onChange={(e) =>
+                            page.setData('description', e.target.value)
+                        }
+                        className="mt-1 block w-full rounded-lg border-neutral-200 text-sm focus:border-primary-700 focus:ring-primary-700"
+                    />
+                    <InputError
+                        message={page.errors.description}
+                        className="mt-2"
+                    />
+                </div>
+                <div>
+                    <InputLabel
+                        htmlFor={`about-${department.id}`}
+                        value="About this department"
+                    />
+                    <textarea
+                        id={`about-${department.id}`}
+                        rows={4}
+                        value={page.data.about}
+                        onChange={(e) => page.setData('about', e.target.value)}
+                        className="mt-1 block w-full rounded-lg border-neutral-200 text-sm focus:border-primary-700 focus:ring-primary-700"
+                    />
+                    <InputError message={page.errors.about} className="mt-2" />
+                </div>
+                <PrimaryButton disabled={page.processing}>
+                    Save page
+                </PrimaryButton>
+            </form>
 
             <div className="mt-5 border-t border-neutral-200 pt-4">
                 <h3 className="font-sans text-sm font-semibold">

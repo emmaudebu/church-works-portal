@@ -34,8 +34,8 @@
                 <th>Member ID</th>
                 <th>Name</th>
                 <th>Unit</th>
-                <th class="num">Attended</th>
-                <th class="num">Services</th>
+                <th class="num">Days attended</th>
+                <th class="num">Service days</th>
                 <th class="num">Rate</th>
                 <th>Group</th>
             </tr>

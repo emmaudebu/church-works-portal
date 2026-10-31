@@ -1,6 +1,6 @@
 import Avatar from '@/Components/Avatar';
-import { CheckedInMember } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { CheckedInMember, PageProps } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import {
@@ -101,6 +101,7 @@ export default function Scanner({
     count: number;
     recent: CheckedInMember[];
 }) {
+    const { branding } = usePage<PageProps>().props;
     const [live, setLive] = useState<Live>({ count, recent });
     const [result, setResult] = useState<Result | null>(null);
     const [scanning, setScanning] = useState(false);
@@ -234,7 +235,7 @@ export default function Scanner({
                         <ArrowLeft size={20} strokeWidth={1.75} />
                     </Link>
                     <img
-                        src="/images/logo-dark.png"
+                        src={branding.logo_dark_url}
                         alt="Church logo"
                         className="h-10 w-auto"
                     />

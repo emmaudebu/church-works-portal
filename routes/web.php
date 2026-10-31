@@ -9,22 +9,21 @@ use App\Http\Controllers\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ScannerController;
 use App\Http\Controllers\Admin\ServiceController;
+use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\ElectionController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrCodeController;
-use App\Models\Department;
-use App\Models\Post;
+use App\Http\Controllers\SiteController;
 use Illuminate\Support\Facades\Route;
-use Inertia\Inertia;
 
-Route::get('/', fn () => Inertia::render('Welcome', [
-    'departments' => Department::forDisplay()->get(),
-    'posts' => Post::publicFacing()->latest('published_at')->limit(3)->get()->map->toCard(),
-]))->name('home');
-
+Route::get('/', [SiteController::class, 'home'])->name('home');
+Route::get('/departments', [SiteController::class, 'departments'])->name('departments');
+Route::get('/departments/{department:slug}', [SiteController::class, 'department'])->name('departments.show');
+Route::get('/news', [SiteController::class, 'news'])->name('news');
 Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
 Route::get('/posts/{post}/calendar', [PostController::class, 'calendar'])->name('posts.calendar');
 
@@ -97,17 +96,27 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::middleware('role:super_admin')->group(function () {
             Route::get('/departments', [DepartmentController::class, 'index'])->name('departments');
             Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
+            Route::post('/departments/{department}/page', [DepartmentController::class, 'updatePage'])->name('departments.page');
             Route::post('/departments/{department}/admins', [DepartmentController::class, 'assignAdmin'])->name('departments.admins.store');
             Route::delete('/departments/{department}/admins/{user}', [DepartmentController::class, 'removeAdmin'])->name('departments.admins.destroy');
             Route::post('/current-department', [DepartmentController::class, 'switch'])->name('current-department');
 
-            Route::get('/settings', fn () => Inertia::render('Admin/Placeholder', ['title' => 'Settings']))->name('settings');
+            Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
+            Route::post('/settings/branding', [SettingsController::class, 'updateBranding'])->name('settings.branding');
+            Route::put('/settings/colors', [SettingsController::class, 'updateColors'])->name('settings.colors');
+            Route::put('/settings/services', [SettingsController::class, 'updateServices'])->name('settings.services');
+            Route::post('/settings/home', [SettingsController::class, 'updateHome'])->name('settings.home');
+            Route::post('/settings/popup', [SettingsController::class, 'updatePopup'])->name('settings.popup');
+            Route::put('/settings/whatsapp', [SettingsController::class, 'updateWhatsapp'])->name('settings.whatsapp');
+            Route::post('/settings/super-admins', [SettingsController::class, 'storeSuperAdmin'])->name('settings.super-admins.store');
+            Route::delete('/settings/super-admins/{user}', [SettingsController::class, 'destroySuperAdmin'])->name('settings.super-admins.destroy');
         });
     });
 });
 
 Route::middleware('auth')->group(function () {
     Route::get('/photos/{user}', [PhotoController::class, 'show'])->name('photos.show');
+    Route::get('/certificates/{user}/{type}', [CertificateController::class, 'show'])->name('certificates.show');
     Route::get('/qr/{user}', [QrCodeController::class, 'show'])->name('qr.show');
     Route::get('/id-card/{user}', [QrCodeController::class, 'idCard'])->name('id-card');
 

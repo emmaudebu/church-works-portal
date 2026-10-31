@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
 use App\Models\MemberProfile;
+use App\Support\Certificates;
 use App\Support\MemberPhoto;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +32,7 @@ class ProfileController extends Controller
                 'date_of_birth' => $request->user()->date_of_birth?->toDateString(),
                 'date_joined' => $request->user()->date_joined?->toDateString(),
                 'profile' => $request->user()->profile,
+                'certificate_urls' => Certificates::urls($request->user()),
             ],
         ]);
     }
@@ -41,7 +43,7 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $user = $request->user();
-        $data = Arr::except($request->validated(), 'photo');
+        $data = Certificates::apply($request, Arr::except($request->validated(), 'photo'), $user);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = MemberPhoto::store($request->file('photo'), $user->photo);

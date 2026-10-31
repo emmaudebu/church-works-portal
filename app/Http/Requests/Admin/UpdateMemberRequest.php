@@ -22,6 +22,7 @@ class UpdateMemberRequest extends MemberRequest
         return [
             ...MemberRules::personal($member),
             ...MemberRules::church(),
+            ...MemberRules::certificates($member, required: false),
             ...MemberRules::emergencyAndExtra(),
             ...($this->user()->hasRole('super_admin') ? MemberRules::department($member->department_id) : []),
             'member_id' => ['required', 'string', 'max:30', Rule::unique(User::class)->ignore($member)],

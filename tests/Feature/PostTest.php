@@ -209,6 +209,52 @@ test('the landing page shows the latest three public posts and no announcements'
         ->where('posts.0.type', 'news'));
 });
 
+test('the public news page lists news and events but not announcements or drafts', function () {
+    Post::factory()->create(['department_id' => $this->technical->id]);
+    Post::factory()->event()->create(['department_id' => $this->technical->id]);
+    Post::factory()->announcement()->create(['department_id' => $this->technical->id]);
+    Post::factory()->draft()->create(['department_id' => $this->technical->id]);
+
+    $this->get(route('news'))->assertInertia(fn (Assert $page) => $page->component('Site/News')->has('posts.data', 2));
+    $this->get(route('news', ['type' => 'event']))->assertInertia(fn (Assert $page) => $page->has('posts.data', 1)->has('calendar', 1));
+});
+
+test('announcements on the news page need a login and stay in the department', function () {
+    Post::factory()->announcement()->create(['department_id' => $this->technical->id]);
+
+    $this->get(route('news', ['type' => 'announcement']))->assertRedirect(route('login', absolute: false));
+
+    $this->actingAs($this->member)->get(route('news', ['type' => 'announcement']))
+        ->assertInertia(fn (Assert $page) => $page->has('posts.data', 1));
+
+    $this->actingAs($this->outsider)->get(route('news', ['type' => 'announcement']))
+        ->assertInertia(fn (Assert $page) => $page->has('posts.data', 0));
+});
+
+test('a post without a cover still has a picture', function () {
+    $post = Post::factory()->create(['department_id' => $this->technical->id]);
+
+    expect($post->toCard()['image_url'])->toStartWith('/images/site/');
+    expect(file_exists(public_path($post->toCard()['image_url'])))->toBeTrue();
+});
+
+test('related posts never reveal announcements to guests', function () {
+    $news = Post::factory()->create(['department_id' => $this->technical->id]);
+    Post::factory()->announcement()->create(['department_id' => $this->technical->id]);
+    Post::factory()->draft()->create(['department_id' => $this->technical->id]);
+
+    $this->get(route('posts.show', $news))->assertInertia(fn (Assert $page) => $page->has('related', 0));
+});
+
+test('the homepage shows the next service and real service times', function () {
+    $this->get('/')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Welcome')
+        ->where('nextService.title', fn ($title) => str_contains($title, 'Service'))
+        ->has('serviceTimes', 2)
+        ->where('stats.departments', 1)
+        ->where('stats.members', 3));
+});
+
 test('guests can read news but must log in for announcements', function () {
     $news = Post::factory()->create(['department_id' => $this->technical->id]);
     $announcement = Post::factory()->announcement()->create(['department_id' => $this->technical->id]);

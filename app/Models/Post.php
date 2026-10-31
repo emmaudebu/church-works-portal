@@ -96,9 +96,24 @@ class Post extends Model
         return $user !== null || $this->type !== 'announcement';
     }
 
-    public function imageUrl(): ?string
+    /**
+     * Pictures for posts without a cover, varied so a page never looks repetitive.
+     */
+    private const FALLBACK_IMAGES = [
+        'news' => ['congregation', 'gathering', 'auditorium'],
+        'event' => ['stage', 'worship', 'praise'],
+        'announcement' => ['surrender', 'sunrise', 'globe', 'cross'],
+    ];
+
+    public function imageUrl(): string
     {
-        return $this->image ? Storage::disk('public')->url($this->image) : null;
+        if ($this->image) {
+            return Storage::disk('public')->url($this->image);
+        }
+
+        $images = self::FALLBACK_IMAGES[$this->type];
+
+        return '/images/site/'.$images[$this->id % count($images)].'.jpg';
     }
 
     /**

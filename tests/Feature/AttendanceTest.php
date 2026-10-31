@@ -235,6 +235,7 @@ test('a special service can be created with a valid window', function () {
 });
 
 test('only an unused special service can be deleted', function () {
+    $this->service->update(['recurring_key' => 'sunday']);
     $special = Service::factory()->create(['department_id' => $this->technical->id, 'type' => 'special']);
 
     $this->actingAs($this->admin)->delete(route('admin.services.destroy', $this->service))->assertStatus(422);
@@ -253,6 +254,69 @@ function heldService(object $test, int $daysAgo, array $present): Service
 
     return $service;
 }
+
+test('being at any service on a day counts as present for that day', function () {
+    $this->member->forceFill(['created_at' => now()->subDays(30)])->save();
+    $this->admin->forceFill(['created_at' => now()->subDays(30)])->save();
+
+    heldService($this, 7, [$this->member]);
+    heldService($this, 7, [$this->admin]);
+    heldService($this, 7, [$this->admin]);
+
+    $this->actingAs($this->member)->get('/attendance')->assertInertia(fn (Assert $page) => $page
+        ->where('overall.attended', 1)
+        ->where('overall.total', 1)
+        ->where('overall.rate', 100));
+});
+
+test('coming to two services on a day still counts once', function () {
+    $this->member->forceFill(['created_at' => now()->subDays(30)])->save();
+
+    heldService($this, 14, [$this->admin]);
+    heldService($this, 7, [$this->member]);
+    heldService($this, 7, [$this->member]);
+
+    $this->actingAs($this->member)->get('/attendance')->assertInertia(fn (Assert $page) => $page
+        ->where('overall.attended', 1)
+        ->where('overall.total', 2));
+});
+
+test('a day with several services is one point on the trend', function () {
+    heldService($this, 7, [$this->member]);
+    heldService($this, 7, [$this->member, $this->admin]);
+
+    $this->actingAs($this->admin)->get('/admin/reports')->assertInertia(fn (Assert $page) => $page
+        ->has('trend', 1)
+        ->where('trend.0.present', 2)
+        ->where('trend.0.title', '2 services')
+        ->where('summary.services', 2));
+});
+
+test('missing some services on a day is not an absence', function () {
+    $this->member->forceFill(['created_at' => now()->subDays(60)])->save();
+
+    foreach ([21, 14, 7] as $daysAgo) {
+        heldService($this, $daysAgo, [$this->admin]);
+        heldService($this, $daysAgo, [$this->member]);
+    }
+
+    $this->actingAs($this->admin)->get('/admin')
+        ->assertInertia(fn (Assert $page) => $page->has('absentees', 0));
+});
+
+test('with several services open the scanner asks which one', function () {
+    Service::factory()->create(['department_id' => $this->technical->id, 'title' => 'Second Service']);
+
+    $this->actingAs($this->admin)->get('/admin/scanner')
+        ->assertInertia(fn (Assert $page) => $page->component('Admin/ScannerPicker'));
+});
+
+test('a member can check in to two services on one day', function () {
+    $second = Service::factory()->create(['department_id' => $this->technical->id, 'title' => 'Second Service']);
+
+    scan($this, $this->member->qr_token)->assertJsonPath('status', 'present');
+    scan($this, $this->member->qr_token, $second)->assertJsonPath('status', 'present');
+});
 
 test('a service nobody attended does not count against anyone', function () {
     $this->member->forceFill(['created_at' => now()->subDays(30)])->save();

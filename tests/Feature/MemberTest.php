@@ -291,6 +291,68 @@ test('members can edit their own details but not their status, id or department'
         ->and($member->department_id)->toBe($this->technical->id);
 });
 
+test('a certificate can be opened by its owner and admins only', function () {
+    Storage::fake('local');
+    Storage::disk('local')->put('certificates/a.pdf', '%PDF-1.4');
+    $this->member->update(['foundation_certificate' => 'certificates/a.pdf']);
+
+    $url = route('certificates.show', ['user' => $this->member, 'type' => 'foundation']);
+
+    $this->get($url)->assertRedirect(route('login', absolute: false));
+    $this->actingAs($this->outsider)->get($url)->assertForbidden();
+    $this->actingAs($this->member)->get($url)->assertOk();
+    $this->actingAs($this->superAdmin)->get($url)->assertOk();
+
+    $response = $this->actingAs($this->deptAdmin)->get($url)->assertOk();
+
+    expect($response->headers->get('Content-Security-Policy'))->toBe('sandbox');
+});
+
+test('a missing certificate or unknown type is not found', function () {
+    $this->actingAs($this->member)->get(route('certificates.show', ['user' => $this->member, 'type' => 'wofbi']))->assertNotFound();
+    $this->actingAs($this->member)->get(route('certificates.show', ['user' => $this->member, 'type' => 'other']))->assertNotFound();
+});
+
+test('a member saying yes on their profile must upload the certificate', function () {
+    $this->member->update(['foundation_class_done' => false]);
+
+    $this->actingAs($this->member)->patch('/profile', bioPayload($this->member, ['foundation_class_done' => true]))
+        ->assertSessionHasErrors('foundation_certificate');
+});
+
+test('existing members already marked yes can still save their profile', function () {
+    $this->member->update(['foundation_class_done' => true]);
+
+    $this->actingAs($this->member)->patch('/profile', bioPayload($this->member, ['foundation_class_done' => true]))
+        ->assertSessionHasNoErrors();
+});
+
+test('changing a class to no removes its certificate', function () {
+    Storage::fake('local');
+    Storage::disk('local')->put('certificates/a.pdf', '%PDF-1.4');
+    $this->member->update(['foundation_class_done' => true, 'foundation_certificate' => 'certificates/a.pdf']);
+
+    $this->actingAs($this->member)->patch('/profile', bioPayload($this->member, ['foundation_class_done' => false]))
+        ->assertSessionHasNoErrors();
+
+    expect($this->member->fresh()->foundation_certificate)->toBeNull();
+    Storage::disk('local')->assertMissing('certificates/a.pdf');
+});
+
+test('an admin can mark a class without a certificate and upload one for the member', function () {
+    Storage::fake('local');
+
+    $this->actingAs($this->deptAdmin)->patch(route('admin.members.update', $this->member), bioPayload($this->member, ['wofbi_done' => true]))
+        ->assertSessionHasNoErrors();
+
+    $this->actingAs($this->deptAdmin)->patch(route('admin.members.update', $this->member), bioPayload($this->member, [
+        'wofbi_done' => true,
+        'wofbi_certificate' => UploadedFile::fake()->image('c.jpg'),
+    ]))->assertSessionHasNoErrors();
+
+    Storage::disk('local')->assertExists($this->member->fresh()->wofbi_certificate);
+});
+
 test('admin notes are not exposed to the member', function () {
     $this->actingAs($this->deptAdmin)
         ->patch(route('admin.members.notes', $this->member), ['admin_notes' => 'Private remark']);

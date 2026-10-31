@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\MemberProfile;
 use App\Models\User;
 use App\Support\AttendanceStats;
+use App\Support\Certificates;
 use App\Support\MemberPhoto;
 use App\Support\Phone;
 use Illuminate\Database\Eloquent\Builder;
@@ -133,7 +134,7 @@ class MemberController extends Controller
     {
         abort_unless($request->user()->canManage($member), 404);
 
-        $data = Arr::except($request->validated(), 'photo');
+        $data = Certificates::apply($request, Arr::except($request->validated(), 'photo'), $member);
 
         if ($request->hasFile('photo')) {
             $data['photo'] = MemberPhoto::store($request->file('photo'), $member->photo);
@@ -196,6 +197,7 @@ class MemberController extends Controller
             'date_joined' => $member->date_joined?->toDateString(),
             'department' => $member->department?->name,
             'photo_url' => $member->photoUrl(),
+            'certificate_urls' => Certificates::urls($member),
             'profile' => $member->profile?->makeVisible('admin_notes'),
         ];
     }

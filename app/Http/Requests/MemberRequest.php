@@ -27,6 +27,10 @@ abstract class MemberRequest extends FormRequest
         return [
             'phone.regex' => 'Enter a full phone number, for example 0801 234 5678.',
             'next_of_kin_phone.regex' => 'Enter a full phone number, for example 0801 234 5678.',
+            'foundation_certificate.required_if_accepted' => 'Please upload your Foundation class certificate.',
+            'wofbi_certificate.required_if_accepted' => 'Please upload your WOFBI certificate.',
+            'foundation_certificate.mimes' => 'Upload a PDF or a photo (JPG, PNG or WebP).',
+            'wofbi_certificate.mimes' => 'Upload a PDF or a photo (JPG, PNG or WebP).',
         ];
     }
 }

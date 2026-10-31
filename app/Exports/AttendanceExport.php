@@ -21,7 +21,7 @@ class AttendanceExport extends StringValueBinder implements FromCollection, Shou
      */
     public function headings(): array
     {
-        return ['Member ID', 'Full name', 'Unit', 'Attended', 'Services', 'Rate %', 'Group'];
+        return ['Member ID', 'Full name', 'Unit', 'Days attended', 'Service days', 'Rate %', 'Group'];
     }
 
     /**

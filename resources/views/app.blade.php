@@ -4,7 +4,9 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
-        <title inertia>{{ config('app.name', 'Laravel') }}</title>
+        <title inertia>{{ App\Support\Settings::churchName() }}</title>
+        <meta name="app-name" content="{{ App\Support\Settings::churchName() }}">
+        <style>:root { {{ App\Support\Settings::cssVariables() }} }</style>
 
         <link rel="icon" type="image/png" href="/images/icons/favicon-48.png">
         <link rel="apple-touch-icon" href="/images/icons/apple-touch-icon.png">
@@ -15,7 +17,7 @@
 
         <!-- Fonts -->
         <link rel="preconnect" href="https://fonts.bunny.net">
-        <link href="https://fonts.bunny.net/css?family=inter:400,500,600|playfair-display:600,700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.bunny.net/css?family=inter:400,500,600|playfair-display:600,600i,700,700i&display=swap" rel="stylesheet" />
 
         <!-- Scripts -->
         @routes

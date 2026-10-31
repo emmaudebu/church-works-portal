@@ -1,4 +1,5 @@
-import { Link } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Link, usePage } from '@inertiajs/react';
 
 export default function Logo({
     variant = 'light',
@@ -11,20 +12,22 @@ export default function Logo({
     className?: string;
     wordmarkClassName?: string;
 }) {
+    const { branding } = usePage<PageProps>().props;
+
     return (
         <Link
             href={href}
             className={`inline-flex items-center gap-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 ${className}`}
         >
             <img
-                src={`/images/logo-${variant}.png`}
+                src={branding[`logo_${variant}_url`]}
                 alt=""
                 className="h-9 w-auto"
             />
             <span
                 className={`font-serif text-lg font-semibold leading-tight ${wordmarkClassName}`}
             >
-                Covenant Workforce
+                {branding.church_name}
             </span>
         </Link>
     );

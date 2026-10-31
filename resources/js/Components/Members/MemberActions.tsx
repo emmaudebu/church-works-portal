@@ -4,7 +4,7 @@ import InputLabel from '@/Components/InputLabel';
 import Modal from '@/Components/Modal';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
-import { whatsappUrl } from '@/lib/whatsapp';
+import { useWhatsapp } from '@/lib/whatsapp';
 import { PageProps } from '@/types';
 import { router, useForm } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
@@ -25,6 +25,7 @@ export function useMemberActions() {
     } | null>(null);
     const [tempPassword, setTempPassword] = useState<string | null>(null);
 
+    const whatsapp = useWhatsapp();
     const form = useForm({ reason: '' });
 
     const close = () => {
@@ -90,9 +91,9 @@ export function useMemberActions() {
                             <div className="mt-6 flex flex-wrap justify-end gap-3">
                                 {target.phone && (
                                     <a
-                                        href={whatsappUrl(
-                                            target.phone,
-                                            `Hello ${target.full_name}, your temporary Covenant Workforce password is ${tempPassword}. Please change it when you log in.`,
+                                        href={whatsapp.tempPassword(
+                                            target,
+                                            tempPassword,
                                         )}
                                         target="_blank"
                                         rel="noreferrer"

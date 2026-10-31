@@ -5,9 +5,12 @@ import {
     isIos,
     takeInstallPrompt,
 } from '@/lib/install';
+import { PageProps } from '@/types';
+import { usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 export default function InstallApp() {
+    const { branding } = usePage<PageProps>().props;
     const [available, setAvailable] = useState(canInstall);
 
     useEffect(() => {
@@ -34,7 +37,7 @@ export default function InstallApp() {
             {available ? (
                 <>
                     <p className="mt-1 text-sm text-neutral-600">
-                        Add Covenant Workforce to your home screen for quick
+                        Add {branding.church_name} to your home screen for quick
                         access.
                     </p>
                     <PrimaryButton

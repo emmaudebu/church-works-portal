@@ -12,6 +12,8 @@ beforeEach(function () {
 
     Storage::fake('local');
 
+    $this->technical = Department::firstWhere('slug', 'technical-unit');
+
     $this->registration = [
         'full_name' => 'Test User',
         'gender' => 'female',
@@ -21,6 +23,7 @@ beforeEach(function () {
         'department_id' => Department::firstWhere('slug', 'technical-unit')->id,
         'unit' => 'Sound',
         'foundation_class_done' => true,
+        'foundation_certificate' => UploadedFile::fake()->create('foundation.pdf', 100, 'application/pdf'),
         'wofbi_done' => false,
         'next_of_kin_name' => 'Kin Person',
         'next_of_kin_relationship' => 'Sister',
@@ -95,4 +98,65 @@ test('a coming soon department can not be joined', function () {
 test('only images are accepted as photos', function () {
     $this->post('/register', [...$this->registration, 'photo' => UploadedFile::fake()->create('cv.pdf', 10, 'application/pdf')])
         ->assertSessionHasErrors('photo');
+});
+
+test('saying yes to a class requires its certificate', function (string $answer, string $certificate) {
+    $data = [...$this->registration, 'foundation_class_done' => false, 'foundation_certificate' => null, $answer => true];
+    $data[$certificate] = null;
+
+    $this->post('/register', $data)->assertSessionHasErrors($certificate);
+
+    expect(User::count())->toBe(0);
+})->with([
+    ['foundation_class_done', 'foundation_certificate'],
+    ['wofbi_done', 'wofbi_certificate'],
+]);
+
+test('the wizard stops at the church step without the certificate', function () {
+    $this->post('/register/check?step=2', [
+        'department_id' => $this->technical->id,
+        'unit' => 'Sound',
+        'foundation_class_done' => true,
+        'wofbi_done' => true,
+    ])->assertSessionHasErrors(['foundation_certificate', 'wofbi_certificate']);
+});
+
+test('saying no needs no certificate', function () {
+    $this->post('/register/check?step=2', [
+        'department_id' => $this->technical->id,
+        'unit' => 'Sound',
+        'foundation_class_done' => false,
+        'wofbi_done' => false,
+    ])->assertSessionHasNoErrors();
+});
+
+test('certificates are stored privately as pdf or photo', function () {
+    $this->post('/register', [
+        ...$this->registration,
+        'wofbi_done' => true,
+        'wofbi_certificate' => UploadedFile::fake()->image('wofbi.png', 2600, 1800),
+    ])->assertSessionHasNoErrors();
+
+    $user = User::firstWhere('phone', '+2348012345678');
+
+    Storage::disk('local')->assertExists([$user->foundation_certificate, $user->wofbi_certificate]);
+
+    expect($user->foundation_certificate)->toEndWith('.pdf')
+        ->and($user->wofbi_certificate)->toEndWith('.jpg')
+        ->and(getimagesizefromstring(Storage::disk('local')->get($user->wofbi_certificate))[0])->toBe(2000)
+        ->and($user->toArray())->toHaveKey('wofbi_certificate');
+});
+
+test('other file types are refused as certificates', function () {
+    $this->post('/register', [
+        ...$this->registration,
+        'foundation_certificate' => UploadedFile::fake()->create('cert.exe', 10, 'application/octet-stream'),
+    ])->assertSessionHasErrors('foundation_certificate');
+});
+
+test('a file attached before changing the answer to no is not kept', function () {
+    $this->post('/register', [...$this->registration, 'foundation_class_done' => false])
+        ->assertSessionHasNoErrors();
+
+    expect(User::firstWhere('phone', '+2348012345678')->foundation_certificate)->toBeNull();
 });

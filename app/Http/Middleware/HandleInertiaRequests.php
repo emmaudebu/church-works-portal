@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Department;
 use App\Support\CurrentDepartment;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -49,6 +50,9 @@ class HandleInertiaRequests extends Middleware
                     'must_change_password' => $request->user()->must_change_password,
                 ] : null,
             ],
+            'branding' => fn () => Settings::branding(),
+            'popup' => fn () => Settings::publicPopup(),
+            'whatsappTemplates' => fn () => $request->user()?->isAdmin() ? Settings::whatsapp() : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'temp_password' => fn () => $request->session()->get('temp_password'),

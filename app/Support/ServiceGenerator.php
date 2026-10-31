@@ -9,8 +9,6 @@ use Carbon\CarbonPeriod;
 
 class ServiceGenerator
 {
-    private const WEEKDAYS = ['sunday' => 0, 'wednesday' => 3];
-
     /**
      * Create the recurring services for every active department. Safe to run
      * repeatedly because a service that already exists is left alone.
@@ -21,20 +19,26 @@ class ServiceGenerator
         $to ??= $from->addDays(config('covenant.services.days_ahead'));
 
         $departments = Department::where('status', 'active')->pluck('id');
+        $recurring = Settings::services();
 
         foreach ($departments as $departmentId) {
             foreach (CarbonPeriod::create($from, $to) as $day) {
-                foreach (config('covenant.services.recurring') as $type => $times) {
-                    if ($day->dayOfWeek !== self::WEEKDAYS[$type]) {
+                foreach ($recurring as $service) {
+                    if ($day->dayOfWeek !== $service['day']) {
                         continue;
                     }
 
                     Service::firstOrCreate(
-                        ['department_id' => $departmentId, 'type' => $type, 'date' => $day->toDateString()],
+                        ['department_id' => $departmentId, 'recurring_key' => $service['key'], 'date' => $day->toDateString()],
                         [
-                            'title' => ucfirst($type).' Service',
-                            'opens_at' => $day->copy()->setTimeFromTimeString($times['opens']),
-                            'closes_at' => $day->copy()->setTimeFromTimeString($times['closes']),
+                            'type' => match ($service['day']) {
+                                0 => 'sunday',
+                                3 => 'wednesday',
+                                default => 'special',
+                            },
+                            'title' => $service['title'],
+                            'opens_at' => $day->copy()->setTimeFromTimeString($service['opens']),
+                            'closes_at' => $day->copy()->setTimeFromTimeString($service['closes']),
                         ],
                     );
                 }

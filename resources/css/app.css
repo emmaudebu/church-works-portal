@@ -48,6 +48,16 @@
         @apply rounded-2xl bg-white shadow-soft;
     }
 
+    /* A small gold label above a section heading. */
+    .eyebrow {
+        @apply text-xs font-semibold uppercase tracking-[0.2em] text-primary-700;
+    }
+
+    /* The italic gold phrase in display headings. */
+    .accent {
+        @apply font-serif font-medium italic text-gold-300;
+    }
+
     /* Signature thin gold line under page titles. */
     .gold-rule {
         @apply mt-2 h-0.5 w-16 bg-gold-500;
@@ -57,7 +67,7 @@
     .bg-hero {
         background:
             radial-gradient(ellipse at 50% 0%, rgba(212, 175, 55, 0.1), transparent 70%),
-            linear-gradient(135deg, theme('colors.primary.900'), theme('colors.primary.700'));
+            linear-gradient(135deg, rgb(var(--primary-900)), rgb(var(--primary-700)));
     }
 }
 
@@ -74,12 +84,39 @@
     animation: scan-line 2s ease-in-out infinite alternate;
 }
 
+/* Only hidden once the scroll observer is running, so nothing can get stuck. */
+.js-reveal .reveal:not(.is-visible) {
+    opacity: 0;
+}
+
+/* The underline that grows under header links. */
+.nav-link {
+    position: relative;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    inset: auto 0 -4px;
+    height: 2px;
+    background: rgb(var(--gold-500));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 200ms ease-out;
+}
+
+.nav-link:hover::after,
+.nav-link:focus-visible::after {
+    transform: scaleX(1);
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
     ::after {
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
         scroll-behavior: auto !important;
     }
 }

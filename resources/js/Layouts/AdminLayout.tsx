@@ -168,7 +168,8 @@ function MemberSearch() {
 }
 
 export default function AdminLayout({ children }: PropsWithChildren) {
-    const { user } = usePage<PageProps>().props.auth;
+    const { auth, branding } = usePage<PageProps>().props;
+    const { user } = auth;
     const isSuperAdmin = user.roles.includes('super_admin');
 
     const [collapsed, setCollapsed] = useState(readCollapsed);
@@ -196,7 +197,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                 <div className="flex h-16 items-center px-4">
                     {collapsed ? (
                         <img
-                            src="/images/logo-dark.png"
+                            src={branding.logo_dark_url}
                             alt=""
                             className="h-9 w-auto"
                         />
@@ -235,7 +236,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                 <DialogPanel className="fixed inset-y-0 left-0 flex w-64 flex-col bg-primary-900">
                     <div className="flex h-16 items-center justify-between px-4">
                         <img
-                            src="/images/logo-dark.png"
+                            src={branding.logo_dark_url}
                             alt=""
                             className="h-9 w-auto"
                         />

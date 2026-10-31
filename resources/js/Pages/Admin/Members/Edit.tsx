@@ -117,7 +117,10 @@ export default function Edit({
                             />
                         </div>
                     )}
-                    <ChurchFields form={form} />
+                    <ChurchFields
+                        form={form}
+                        certificateUrls={member.certificate_urls}
+                    />
                 </section>
 
                 <section className="card space-y-4 p-4 sm:p-6">

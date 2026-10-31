@@ -7,6 +7,7 @@ use App\Http\Requests\RegisterMemberRequest;
 use App\Models\Department;
 use App\Models\MemberProfile;
 use App\Models\User;
+use App\Support\Certificates;
 use App\Support\MemberPhoto;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -41,7 +42,7 @@ class RegisteredUserController extends Controller
      */
     public function store(RegisterMemberRequest $request): RedirectResponse
     {
-        $data = $request->validated();
+        $data = Certificates::apply($request, $request->validated());
 
         $photo = MemberPhoto::store($request->file('photo'));
 

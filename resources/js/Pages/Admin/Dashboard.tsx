@@ -163,7 +163,7 @@ export default function Dashboard({
                     <Panel title="Absentee alerts">
                         {absentees.length === 0 ? (
                             <p className="text-sm text-neutral-600">
-                                Nobody has missed 3 services in a row.
+                                Nobody has missed 3 service days in a row.
                             </p>
                         ) : (
                             <ul className="space-y-2 text-sm">
@@ -182,7 +182,7 @@ export default function Dashboard({
                                             {member.full_name}
                                         </Link>
                                         <span className="shrink-0 tabular-nums text-danger">
-                                            Missed {member.missed}
+                                            Missed {member.missed} days
                                         </span>
                                     </li>
                                 ))}

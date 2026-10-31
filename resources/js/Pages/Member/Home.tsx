@@ -55,7 +55,8 @@ export default function Home({
     announcements: PostCardData[];
     events: PostCardData[];
 }) {
-    const { user } = usePage<PageProps>().props.auth;
+    const { auth, branding } = usePage<PageProps>().props;
+    const { user } = auth;
 
     return (
         <MemberLayout>
@@ -72,7 +73,7 @@ export default function Home({
                         Welcome back, {user.full_name.split(' ')[0]}
                     </h1>
                     <p className="text-sm text-gold-300">
-                        {user.unit ?? user.department ?? 'Covenant Workforce'}
+                        {user.unit ?? user.department ?? branding.church_name}
                     </p>
                 </div>
             </section>
@@ -106,7 +107,7 @@ export default function Home({
                         This month
                     </span>
                     <span className="text-sm tabular-nums text-neutral-600">
-                        {month.attended} of {month.total} services
+                        {month.attended} of {month.total} service days
                     </span>
                     <span className="mt-1 block text-sm font-medium text-primary-700">
                         View history
@@ -148,13 +149,21 @@ export default function Home({
                             <li key={post.id}>
                                 <Link
                                     href={route('posts.show', post.id)}
-                                    className="card block border-l-2 border-gold-500 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                                    className="card flex overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
                                 >
-                                    <span className="block font-medium">
-                                        {post.title}
-                                    </span>
-                                    <span className="mt-1 block text-sm text-neutral-600">
-                                        {post.excerpt}
+                                    <img
+                                        src={post.image_url}
+                                        alt=""
+                                        loading="lazy"
+                                        className="w-24 shrink-0 object-cover"
+                                    />
+                                    <span className="min-w-0 border-l-2 border-gold-500 p-4">
+                                        <span className="block font-medium">
+                                            {post.title}
+                                        </span>
+                                        <span className="mt-1 block text-sm text-neutral-600">
+                                            {post.excerpt}
+                                        </span>
                                     </span>
                                 </Link>
                             </li>

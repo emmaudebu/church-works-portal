@@ -35,7 +35,7 @@ In production, set `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` before seeding
 
 ## Services
 
-Sunday and Wednesday services are created automatically for active departments. Set their attendance windows with `SUNDAY_OPENS`, `SUNDAY_CLOSES`, `WEDNESDAY_OPENS` and `WEDNESDAY_CLOSES` in `.env`. In production, run `php artisan schedule:run` every minute from cron.
+Recurring services are created automatically for active departments. Super admins add as many as they need, on any day, in Settings; `SUNDAY_OPENS`, `SUNDAY_CLOSES`, `WEDNESDAY_OPENS` and `WEDNESDAY_CLOSES` in `.env` are only the starting values. In production, run `php artisan schedule:run` every minute from cron.
 
 The QR scanner needs camera access, which browsers only allow on `https` or `localhost`.
 

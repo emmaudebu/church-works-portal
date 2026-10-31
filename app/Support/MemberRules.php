@@ -42,6 +42,29 @@ class MemberRules
     }
 
     /**
+     * A certificate must back up a "yes", unless one was accepted earlier.
+     *
+     * @return array<string, array<mixed>>
+     */
+    public static function certificates(?User $user = null, bool $required = true): array
+    {
+        $rules = [];
+
+        foreach (Certificates::FIELDS as $field => $answer) {
+            $alreadyAnswered = $user?->{$answer} || $user?->{$field};
+
+            $rules[$field] = [
+                $required && ! $alreadyAnswered ? "required_if_accepted:{$answer}" : 'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:8192',
+            ];
+        }
+
+        return $rules;
+    }
+
+    /**
      * Only active departments can be joined; coming soon ones are not open yet.
      * Someone already in a department that closed may stay in it.
      *

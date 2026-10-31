@@ -1,6 +1,7 @@
 import Avatar from '@/Components/Avatar';
 import PrimaryButton from '@/Components/PrimaryButton';
-import { Head } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, usePage } from '@inertiajs/react';
 
 export default function IdCard({
     member,
@@ -14,6 +15,8 @@ export default function IdCard({
         qr_url: string;
     };
 }) {
+    const { branding } = usePage<PageProps>().props;
+
     return (
         <main className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-50 p-4 print:block print:min-h-0 print:bg-white print:p-0">
             <Head title={`ID card - ${member.full_name}`} />
@@ -22,12 +25,12 @@ export default function IdCard({
                 <div className="flex min-w-0 flex-1 flex-col bg-charcoal-900 p-[4%] text-white">
                     <div className="flex items-center gap-[3%]">
                         <img
-                            src="/images/logo-dark.png"
+                            src={branding.logo_dark_url}
                             alt=""
                             className="h-[1.7em] w-auto"
                         />
                         <p className="font-serif text-[0.8em] leading-tight">
-                            Covenant Workforce
+                            {branding.church_name}
                         </p>
                     </div>
                     <div className="mt-[3%] h-px bg-gold-500" />

@@ -1,52 +1,372 @@
 import DepartmentCard from '@/Components/DepartmentCard';
 import EmptyState from '@/Components/EmptyState';
 import PostCard from '@/Components/PostCard';
+import Countdown from '@/Components/Site/Countdown';
+import CountUp from '@/Components/Site/CountUp';
+import FloatingShapes from '@/Components/Site/FloatingShapes';
+import HeroSlider from '@/Components/Site/HeroSlider';
+import SectionHeading from '@/Components/Site/SectionHeading';
 import PublicLayout from '@/Layouts/PublicLayout';
-import { Department, PostCard as PostCardData } from '@/types';
-import { Head, Link } from '@inertiajs/react';
-import { Newspaper } from 'lucide-react';
+import {
+    Department,
+    HomeContent,
+    PageProps,
+    PostCard as PostCardData,
+} from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { ArrowRight, Clock, MapPin, Newspaper } from 'lucide-react';
+
+type NextService = {
+    title: string;
+    date_label: string;
+    time: string;
+    opens_at: string;
+};
+
+const STEPS = [
+    {
+        image: '/images/site/gathering.jpg',
+        title: 'Register and get approved',
+        text: 'Share your details and photo. An admin in your department confirms them.',
+    },
+    {
+        image: '/images/site/auditorium.jpg',
+        title: 'Check in with your QR code',
+        text: 'Show your personal code at every service. Your attendance is kept for you.',
+    },
+    {
+        image: '/images/site/praise.jpg',
+        title: 'Stay part of the work',
+        text: 'Follow news and events, read announcements and vote in your department.',
+    },
+];
+
+function ArrowLink({ href, label }: { href: string; label: string }) {
+    const external = href.startsWith('http');
+    const Anchor = external ? 'a' : Link;
+
+    return (
+        <Anchor
+            href={href}
+            {...(external ? { target: '_blank', rel: 'noreferrer' } : {})}
+            className="group inline-flex items-center gap-2 rounded-full bg-primary-700 px-6 py-3 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+        >
+            {label}
+            <ArrowRight
+                size={16}
+                strokeWidth={1.75}
+                aria-hidden="true"
+                className="transition group-hover:translate-x-1"
+            />
+        </Anchor>
+    );
+}
+
+function SpotlightCard({ post, label }: { post: PostCardData; label: string }) {
+    return (
+        <div className="p-6 md:p-8">
+            <p className="eyebrow">{label}</p>
+            <div className="mt-4 flex items-start gap-4">
+                <div className="flex w-16 shrink-0 flex-col items-center rounded-t-full bg-primary-900 px-1 pb-2 pt-4 text-white">
+                    <span className="font-serif text-2xl leading-none tabular-nums text-gold-300">
+                        {post.day}
+                    </span>
+                    <span className="mt-1 text-xs uppercase tracking-wider">
+                        {post.month}
+                    </span>
+                </div>
+                <div className="min-w-0">
+                    <Link
+                        href={route('posts.show', post.id)}
+                        className="font-serif text-xl font-semibold leading-snug hover:text-primary-700 focus:outline-none focus-visible:underline"
+                    >
+                        {post.title}
+                    </Link>
+                    <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-neutral-600">
+                        <span className="inline-flex items-center gap-1">
+                            <Clock
+                                size={16}
+                                strokeWidth={1.75}
+                                aria-hidden="true"
+                            />
+                            {post.date_label}
+                        </span>
+                        {post.venue && (
+                            <span className="inline-flex items-center gap-1">
+                                <MapPin
+                                    size={16}
+                                    strokeWidth={1.75}
+                                    aria-hidden="true"
+                                />
+                                {post.venue}
+                            </span>
+                        )}
+                    </p>
+                </div>
+            </div>
+            <p className="mt-3 text-sm text-neutral-600">{post.excerpt}</p>
+        </div>
+    );
+}
 
 export default function Welcome({
+    home,
     departments,
     posts,
+    nextService,
+    nextEvent,
+    latestNews,
+    serviceTimes,
+    stats,
 }: {
+    home: HomeContent;
     departments: Department[];
     posts: PostCardData[];
+    nextService: NextService | null;
+    nextEvent: PostCardData | null;
+    latestNews: PostCardData | null;
+    serviceTimes: { key: string; title: string; day: string; time: string }[];
+    stats: { members: number; departments: number; services: number };
 }) {
-    return (
-        <PublicLayout>
-            <Head title="Serving with Excellence" />
+    const { user } = usePage<PageProps>().props.auth;
 
-            <section className="bg-hero px-4 py-20 text-center text-white md:px-8 md:py-28">
-                <h1 className="text-4xl font-bold md:text-5xl">
-                    Serving with Excellence
-                </h1>
-                <div className="mx-auto mt-4 h-0.5 w-16 bg-gold-500" />
-                <p className="mx-auto mt-4 max-w-xl text-lg text-white">
-                    Members, attendance, events and elections in one place
-                </p>
-                <div className="mt-8 flex flex-wrap justify-center gap-3">
-                    <Link
-                        href={route('register')}
-                        className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-900"
+    const topBar = nextService && (
+        <div className="hidden border-b border-white/15 md:block">
+            <p className="mx-auto max-w-7xl px-8 py-2 text-xs">
+                <span className="text-gold-300">Next gathering</span>{' '}
+                <strong className="font-semibold">{nextService.title}</strong>{' '}
+                {nextService.date_label}, {nextService.time}
+            </p>
+        </div>
+    );
+
+    const spotlight = [
+        nextEvent && { post: nextEvent, label: 'Next event' },
+        latestNews && { post: latestNews, label: 'Latest news' },
+    ].filter((item) => !!item);
+
+    return (
+        <PublicLayout topBar={topBar}>
+            <Head title="Serving with Excellence">
+                <link
+                    rel="preload"
+                    as="image"
+                    href={home.slides[0].image}
+                />
+            </Head>
+
+            <HeroSlider
+                slides={home.slides}
+                actions={
+                    user ? (
+                        <Link
+                            href={route('dashboard')}
+                            className="inline-flex items-center gap-2 rounded-full bg-primary-700 px-6 py-3 text-sm font-semibold transition hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
+                        >
+                            Go to my dashboard
+                            <ArrowRight
+                                size={16}
+                                strokeWidth={1.75}
+                                aria-hidden="true"
+                            />
+                        </Link>
+                    ) : (
+                    <>
+                        <Link
+                            href={route('register')}
+                            className="inline-flex items-center gap-2 rounded-full bg-primary-700 px-6 py-3 text-sm font-semibold transition hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
+                        >
+                            Register
+                            <ArrowRight
+                                size={16}
+                                strokeWidth={1.75}
+                                aria-hidden="true"
+                            />
+                        </Link>
+                        <Link
+                            href={route('login')}
+                            className="rounded-full border border-white/60 px-6 py-3 text-sm font-semibold transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
+                        >
+                            Login
+                        </Link>
+                    </>
+                    )
+                }
+                aside={
+                    nextService && (
+                        <aside className="animate-float rounded-2xl border border-white/15 bg-charcoal-900/70 p-5 backdrop-blur">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-300">
+                                Next gathering
+                            </p>
+                            <p className="mt-2 font-serif text-2xl">
+                                {nextService.title}
+                            </p>
+                            <p className="text-sm text-silver-300">
+                                {nextService.date_label}, {nextService.time}
+                            </p>
+                            <div className="mt-4">
+                                <Countdown to={nextService.opens_at} />
+                            </div>
+                        </aside>
+                    )
+                }
+            />
+
+            {spotlight.length > 0 && (
+                <div className="relative z-10 mx-auto -mt-16 max-w-7xl px-4 md:-mt-24 md:px-8">
+                    <div
+                        className={`reveal card grid divide-y divide-neutral-200 md:divide-x md:divide-y-0 ${
+                            spotlight.length > 1 ? 'md:grid-cols-2' : ''
+                        }`}
                     >
-                        Register
-                    </Link>
-                    <Link
-                        href={route('login')}
-                        className="rounded-lg border border-white px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 focus-visible:ring-offset-2 focus-visible:ring-offset-primary-900"
-                    >
-                        Login
-                    </Link>
+                        {spotlight.map((item) => (
+                            <SpotlightCard key={item.label} {...item} />
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <section className="relative overflow-hidden">
+                <FloatingShapes />
+                <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 md:px-8 lg:grid-cols-2">
+                <div className="reveal relative mx-auto w-full max-w-md lg:mx-0">
+                    <img
+                        src={home.welcome.image}
+                        alt=""
+                        loading="lazy"
+                        className="aspect-[4/5] w-4/5 rounded-t-full object-cover shadow-soft"
+                    />
+                    <div className="absolute right-0 top-10 flex h-32 w-32 animate-pulse flex-col items-center justify-center rounded-full bg-primary-700 text-center text-white ring-4 ring-gold-500/40">
+                        <span className="font-serif text-3xl tabular-nums">
+                            <CountUp value={stats.members} />
+                        </span>
+                        <span className="px-3 text-[10px] uppercase leading-tight tracking-wider">
+                            Workers serving
+                        </span>
+                    </div>
+                    <img
+                        src={home.welcome.small_image}
+                        alt=""
+                        loading="lazy"
+                        className="absolute -bottom-6 right-2 h-40 w-40 animate-float rounded-full border-4 border-white object-cover shadow-soft"
+                    />
+                </div>
+                <div className="reveal">
+                    <p className="eyebrow">{home.welcome.eyebrow}</p>
+                    <h2 className="mt-2 text-4xl leading-tight md:text-5xl">
+                        {home.welcome.title}{' '}
+                        <em className="font-medium text-primary-700">
+                            {home.welcome.accent}
+                        </em>
+                    </h2>
+                    <p className="mt-5 whitespace-pre-line text-neutral-600">
+                        {home.welcome.text}
+                    </p>
+                    <dl className="mt-8 grid grid-cols-3 divide-x divide-neutral-200 border-y border-neutral-200">
+                        {[
+                            [stats.members, 'Members'],
+                            [stats.departments, 'Departments'],
+                            [stats.services, 'Services a week'],
+                        ].map(([value, label]) => (
+                            <div key={label} className="px-3 py-4 first:pl-0">
+                                <dt className="sr-only">{label}</dt>
+                                <dd className="font-serif text-3xl tabular-nums">
+                                    <CountUp value={Number(value)} />
+                                </dd>
+                                <p className="text-sm text-neutral-600">
+                                    {label}
+                                </p>
+                            </div>
+                        ))}
+                    </dl>
+                    <div className="mt-8">
+                        <ArrowLink
+                            href={home.welcome.button_link}
+                            label={home.welcome.button_label}
+                        />
+                    </div>
+                </div>
                 </div>
             </section>
 
-            <section
-                id="departments"
-                className="mx-auto max-w-6xl scroll-mt-4 px-4 py-14 md:px-8"
-            >
-                <h2 className="text-3xl">Our Departments</h2>
-                <div className="gold-rule mb-8" />
+            <section className="relative overflow-hidden bg-neutral-50 py-20">
+                <FloatingShapes />
+                <div className="relative mx-auto grid max-w-7xl gap-10 px-4 md:px-8 lg:grid-cols-[2fr_3fr]">
+                    <div className="reveal">
+                        <p className="eyebrow">Join the workforce</p>
+                        <h2 className="mt-2 text-4xl leading-tight">
+                            Your Place{' '}
+                            <em className="font-medium text-primary-700">
+                                In The Work
+                            </em>
+                        </h2>
+                        <p className="mt-4 text-neutral-600">
+                            Three simple steps to start serving with us.
+                        </p>
+
+                        {serviceTimes.length > 0 && (
+                            <div className="mt-8 rounded-2xl bg-charcoal-900 p-6 text-white">
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-300">
+                                    Service times
+                                </p>
+                                <ul className="mt-4 space-y-3 text-sm">
+                                    {serviceTimes.map((service) => (
+                                        <li
+                                            key={service.key}
+                                            className="flex justify-between gap-4 border-b border-white/10 pb-3 last:border-0 last:pb-0"
+                                        >
+                                            <span>{service.title}</span>
+                                            <span className="shrink-0 text-silver-300">
+                                                {service.day}, {service.time}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+
+                    <ol className="space-y-5">
+                        {STEPS.map((step, index) => (
+                            <li
+                                key={step.title}
+                                className="reveal group card flex flex-col overflow-hidden transition duration-300 hover:-translate-y-1 sm:flex-row"
+                            >
+                                <div className="relative h-44 shrink-0 overflow-hidden bg-charcoal-900 sm:h-auto sm:w-2/5">
+                                    <img
+                                        src={step.image}
+                                        alt=""
+                                        loading="lazy"
+                                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                                    />
+                                    <span className="absolute bottom-2 left-4 font-serif text-5xl italic text-white drop-shadow">
+                                        0{index + 1}
+                                    </span>
+                                </div>
+                                <div className="p-6">
+                                    <h3 className="text-xl">{step.title}</h3>
+                                    <p className="mt-2 text-sm text-neutral-600">
+                                        {step.text}
+                                    </p>
+                                </div>
+                            </li>
+                        ))}
+                    </ol>
+                </div>
+            </section>
+
+            <section className="mx-auto max-w-7xl px-4 py-20 md:px-8">
+                <SectionHeading
+                    eyebrow="Serve with us"
+                    title="Our"
+                    accent="Departments"
+                    action={
+                        <ArrowLink
+                            href={route('departments')}
+                            label="All departments"
+                        />
+                    }
+                />
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                     {departments.map((department) => (
                         <DepartmentCard
@@ -57,13 +377,16 @@ export default function Welcome({
                 </div>
             </section>
 
-            <section className="bg-neutral-50">
-                <div
-                    id="news"
-                    className="mx-auto max-w-6xl scroll-mt-4 px-4 py-14 md:px-8"
-                >
-                    <h2 className="text-3xl">News and Events</h2>
-                    <div className="gold-rule mb-8" />
+            <section className="bg-neutral-50 py-20">
+                <div className="mx-auto max-w-7xl px-4 md:px-8">
+                    <SectionHeading
+                        eyebrow="What's happening"
+                        title="News and"
+                        accent="Events"
+                        action={
+                            <ArrowLink href={route('news')} label="See all" />
+                        }
+                    />
                     {posts.length === 0 ? (
                         <EmptyState
                             icon={Newspaper}

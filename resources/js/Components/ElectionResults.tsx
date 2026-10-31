@@ -11,7 +11,7 @@ import {
 } from 'recharts';
 
 const INK = '#1A1A1A';
-const BAR = '#B81C19';
+const BAR = 'rgb(var(--primary-700))';
 
 function ChartTooltip({ active, payload }: TooltipContentProps) {
     const row = payload?.[0]?.payload as

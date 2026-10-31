@@ -92,7 +92,7 @@ class PostController extends Controller
             'post' => [
                 ...$post->only(['id', 'type', 'title', 'body', 'venue']),
                 'event_date' => $post->event_date?->format('Y-m-d\TH:i'),
-                'image_url' => $post->imageUrl(),
+                'image_url' => $post->image ? $post->imageUrl() : null,
                 'published' => $post->isPublished(),
             ],
             'audience' => $post->department?->name ?? 'Whole church',

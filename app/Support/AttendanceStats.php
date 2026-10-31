@@ -28,11 +28,14 @@ class AttendanceStats
         return $members->mapWithKeys(function (User $member) use ($held, $attended) {
             $present = $attended->get($member->id, collect())->pluck('service_id')->flip();
 
-            $services = $held->filter(fn (Service $service) => $service->department_id === $member->department_id
-                && ($service->date->gte($member->created_at->startOfDay()) || $present->has($service->id)));
+            // A date counts once: being at any service that day is being present.
+            $days = $held
+                ->filter(fn (Service $service) => $service->department_id === $member->department_id
+                    && ($service->date->gte($member->created_at->startOfDay()) || $present->has($service->id)))
+                ->groupBy(fn (Service $service) => $service->date->toDateString());
 
-            $total = $services->count();
-            $count = $services->filter(fn (Service $service) => $present->has($service->id))->count();
+            $total = $days->count();
+            $count = $days->filter(fn ($services) => $services->contains(fn (Service $service) => $present->has($service->id)))->count();
 
             return [$member->id => [
                 'attended' => $count,
@@ -74,13 +77,14 @@ class AttendanceStats
         return $members->map(function (User $member) use ($held, $present) {
             $missed = 0;
 
-            foreach ($held->sortByDesc('date') as $service) {
-                if ($service->department_id !== $member->department_id
-                    || $service->date->lt($member->created_at->startOfDay())) {
-                    continue;
-                }
+            $days = $held
+                ->filter(fn (Service $service) => $service->department_id === $member->department_id
+                    && $service->date->gte($member->created_at->startOfDay()))
+                ->groupBy(fn (Service $service) => $service->date->toDateString())
+                ->sortKeysDesc();
 
-                if ($present->get($member->id)?->has($service->id)) {
+            foreach ($days as $services) {
+                if ($services->contains(fn (Service $service) => $present->get($member->id)?->has($service->id))) {
                     break;
                 }
 
@@ -92,25 +96,34 @@ class AttendanceStats
     }
 
     /**
-     * Percent of the members who were present at each held service.
+     * Percent of the members who were present on each day services were held.
      *
      * @param  Collection<int, Service>  $held
      * @return Collection<int, array<string, mixed>>
      */
     public static function trend(Collection $held, int $memberCount): Collection
     {
-        $counts = Attendance::whereIn('service_id', $held->pluck('id'))
-            ->selectRaw('service_id, count(*) as total')
-            ->groupBy('service_id')
-            ->pluck('total', 'service_id');
+        $attendance = Attendance::whereIn('service_id', $held->pluck('id'))
+            ->get(['service_id', 'user_id'])
+            ->groupBy('service_id');
 
-        return $held->map(fn (Service $service) => [
-            'id' => $service->id,
-            'title' => $service->title,
-            'date' => $service->date->toDateString(),
-            'label' => $service->date->format('j M'),
-            'present' => (int) $counts->get($service->id, 0),
-            'rate' => $memberCount ? min(100, (int) round($counts->get($service->id, 0) / $memberCount * 100)) : 0,
-        ])->values();
+        return $held->groupBy(fn (Service $service) => $service->date->toDateString())
+            ->map(function (Collection $services) use ($attendance, $memberCount) {
+                $present = $services
+                    ->flatMap(fn (Service $service) => $attendance->get($service->id, collect())->pluck('user_id'))
+                    ->unique()
+                    ->count();
+
+                $first = $services->first();
+
+                return [
+                    'id' => $first->id,
+                    'title' => $services->count() > 1 ? $services->count().' services' : $first->title,
+                    'date' => $first->date->toDateString(),
+                    'label' => $first->date->format('j M'),
+                    'present' => $present,
+                    'rate' => $memberCount ? min(100, (int) round($present / $memberCount * 100)) : 0,
+                ];
+            })->values();
     }
 }

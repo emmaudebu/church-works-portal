@@ -9,7 +9,7 @@ import Pagination, { PageLink } from '@/Components/Pagination';
 import PrimaryButton from '@/Components/PrimaryButton';
 import StatusBadge from '@/Components/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { greetingUrl } from '@/lib/whatsapp';
+import { useWhatsapp } from '@/lib/whatsapp';
 import { MemberRow } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Download, Users } from 'lucide-react';
@@ -32,6 +32,7 @@ export default function Index({
     const [search, setSearch] = useState(filters.search ?? '');
     const [selected, setSelected] = useState<number[]>([]);
     const actions = useMemberActions();
+    const whatsapp = useWhatsapp();
 
     const apply = (changes: Filters) =>
         router.get(
@@ -65,7 +66,7 @@ export default function Index({
             ? [
                   {
                       label: 'WhatsApp',
-                      href: greetingUrl(member.phone, member.full_name),
+                      href: whatsapp.greeting(member.phone, member.full_name),
                       external: true,
                   },
               ]

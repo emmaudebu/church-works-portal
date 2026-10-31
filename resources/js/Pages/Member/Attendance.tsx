@@ -65,7 +65,7 @@ export default function Attendance({
             <p className="text-sm text-neutral-600">
                 {overall.rate === null
                     ? 'No services recorded yet.'
-                    : `Overall ${overall.rate}%, ${overall.attended} of ${overall.total} services`}
+                    : `Overall ${overall.rate}%, ${overall.attended} of ${overall.total} service days`}
             </p>
 
             <section className="card mt-4 p-4">

@@ -5,6 +5,8 @@ use App\Models\User;
 use App\Support\CurrentDepartment;
 use Database\Seeders\DepartmentSeeder;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function () {
@@ -40,6 +42,55 @@ test('the landing page lists active departments first with active member counts'
         ->where('departments.0.slug', 'technical-unit')
         ->where('departments.0.members_count', 2)
         ->where('departments.1.status', 'coming_soon'));
+});
+
+test('every department has its own public page', function () {
+    User::factory()->create(['department_id' => $this->technical->id, 'unit' => 'Sound']);
+
+    $this->get(route('departments'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('Site/Departments')->has('departments', 3));
+
+    $this->get(route('departments.show', 'technical-unit'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Site/Department')
+            ->where('department.name', 'Technical Unit')
+            ->where('units.0', 'Sound')
+            ->has('others', 2));
+
+    $this->get(route('departments.show', 'choir'))->assertOk();
+    $this->get('/departments/nothing-here')->assertNotFound();
+});
+
+test('a department page shows no suspended members in its units or count', function () {
+    User::factory()->suspended()->create(['department_id' => $this->technical->id, 'unit' => 'Hidden']);
+
+    $this->get(route('departments.show', 'technical-unit'))
+        ->assertInertia(fn (Assert $page) => $page->has('units', 0)->where('department.members_count', 0));
+});
+
+test('a super admin can write a department page and upload its picture', function () {
+    Storage::fake('public');
+
+    $this->actingAs($this->superAdmin)->post(route('admin.departments.page', $this->technical), [
+        'description' => 'New line',
+        'about' => 'Our story',
+        'image' => UploadedFile::fake()->image('team.jpg', 1000, 600),
+    ])->assertSessionHasNoErrors();
+
+    $department = $this->technical->fresh();
+
+    expect($department->about)->toBe('Our story');
+    Storage::disk('public')->assertExists($department->image);
+
+    $this->actingAs($this->superAdmin)->post(route('admin.departments.page', $this->technical), ['about' => 'Edited', 'image' => null]);
+
+    expect($this->technical->fresh()->image)->toBe($department->image);
+});
+
+test('department admins can not edit department pages', function () {
+    $admin = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+
+    $this->actingAs($admin)->post(route('admin.departments.page', $this->technical), ['about' => 'x'])->assertForbidden();
 });
 
 test('a super admin can switch a department on without a rebuild', function () {

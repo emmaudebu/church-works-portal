@@ -12,7 +12,7 @@ import {
 
 const INK = '#57534E';
 const GRID = '#E7E4DF';
-const LINE = '#B81C19';
+const LINE = 'rgb(var(--primary-700))';
 
 function ChartTooltip({ active, payload }: TooltipContentProps) {
     const point = payload?.[0]?.payload as TrendPoint | undefined;

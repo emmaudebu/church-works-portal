@@ -56,6 +56,12 @@ class PostController extends Controller
 
         return Inertia::render('Posts/Show', [
             'post' => [...$post->toCard(), 'body' => $post->body],
+            'related' => ($request->user()?->department_id ? Post::visibleTo($request->user()) : Post::publicFacing())
+                ->whereKeyNot($post->id)
+                ->latest('published_at')
+                ->limit(3)
+                ->get()
+                ->map->toCard(),
         ]);
     }
 

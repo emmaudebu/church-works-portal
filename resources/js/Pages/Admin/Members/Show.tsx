@@ -10,7 +10,7 @@ import SecondaryButton from '@/Components/SecondaryButton';
 import DangerButton from '@/Components/DangerButton';
 import StatusBadge from '@/Components/StatusBadge';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { greetingUrl } from '@/lib/whatsapp';
+import { useWhatsapp } from '@/lib/whatsapp';
 import { MemberRecord } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { History, MessageCircle } from 'lucide-react';
@@ -67,6 +67,7 @@ export default function Show({
     };
 }) {
     const actions = useMemberActions();
+    const whatsapp = useWhatsapp();
     const profile = member.profile;
 
     const notes = useForm({ admin_notes: profile?.admin_notes ?? '' });
@@ -103,7 +104,7 @@ export default function Show({
                     <div className="flex flex-wrap gap-2">
                         {member.phone && (
                             <a
-                                href={greetingUrl(
+                                href={whatsapp.greeting(
                                     member.phone,
                                     member.full_name,
                                 )}
@@ -215,6 +216,42 @@ export default function Show({
                             ],
                         ]}
                     />
+                    <dl className="mt-4 grid gap-x-6 gap-y-3 border-t border-neutral-200 pt-4 text-sm sm:grid-cols-2">
+                        {(
+                            [
+                                [
+                                    'Foundation certificate',
+                                    member.foundation_class_done,
+                                    member.certificate_urls.foundation,
+                                ],
+                                [
+                                    'WOFBI certificate',
+                                    member.wofbi_done,
+                                    member.certificate_urls.wofbi,
+                                ],
+                            ] as const
+                        ).map(([label, completed, url]) => (
+                            <div key={label}>
+                                <dt className="text-neutral-600">{label}</dt>
+                                <dd className="font-medium">
+                                    {url ? (
+                                        <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-primary-700 underline"
+                                        >
+                                            View certificate
+                                        </a>
+                                    ) : completed ? (
+                                        'Not uploaded'
+                                    ) : (
+                                        '—'
+                                    )}
+                                </dd>
+                            </div>
+                        ))}
+                    </dl>
                 </Section>
 
                 <Section title="Emergency contact">
@@ -234,7 +271,7 @@ export default function Show({
                     <p className="text-sm text-neutral-600">
                         {attendance.rate === null
                             ? 'No services held yet.'
-                            : `${attendance.rate}% (${attendance.attended} of ${attendance.total} services)`}
+                            : `${attendance.rate}% (${attendance.attended} of ${attendance.total} service days)`}
                     </p>
                     {attendance.recent.length > 0 && (
                         <ul className="mt-3 divide-y divide-neutral-200 text-sm">

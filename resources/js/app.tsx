@@ -6,7 +6,9 @@ import { createRoot } from 'react-dom/client';
 import OfflineBanner from './Components/OfflineBanner';
 import { listenForInstallPrompt } from './lib/install';
 
-const appName = import.meta.env.VITE_APP_NAME || 'Covenant Workforce';
+const appName =
+    document.querySelector<HTMLMetaElement>('meta[name="app-name"]')?.content ??
+    'Covenant Workforce';
 
 listenForInstallPrompt();
 

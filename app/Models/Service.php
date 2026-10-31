@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['department_id', 'type', 'title', 'date', 'opens_at', 'closes_at', 'is_open'])]
+#[Fillable(['department_id', 'type', 'recurring_key', 'title', 'date', 'opens_at', 'closes_at', 'is_open'])]
 class Service extends Model
 {
     /** @use HasFactory<ServiceFactory> */

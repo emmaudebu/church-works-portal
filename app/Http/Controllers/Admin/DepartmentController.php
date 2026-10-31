@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\User;
 use App\Support\CurrentDepartment;
+use App\Support\PostImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -22,7 +24,11 @@ class DepartmentController extends Controller
         return Inertia::render('Admin/Departments', [
             'departments' => Department::forDisplay()
                 ->with(['users' => fn ($users) => $users->role('dept_admin')->select('id', 'department_id', 'full_name')->orderBy('full_name')])
-                ->get(),
+                ->get()
+                ->map(fn (Department $department) => [
+                    ...$department->toCard(),
+                    'users' => $department->users,
+                ]),
             'candidates' => User::where('status', 'active')
                 ->withoutRole(['super_admin', 'dept_admin'])
                 ->orderBy('full_name')
@@ -40,6 +46,27 @@ class DepartmentController extends Controller
         ]));
 
         return back();
+    }
+
+    /**
+     * Save the description, story and picture shown on the department's page.
+     */
+    public function updatePage(Request $request, Department $department): RedirectResponse
+    {
+        $validated = $request->validate([
+            'description' => ['nullable', 'string', 'max:255'],
+            'about' => ['nullable', 'string', 'max:3000'],
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+        ]);
+
+        $department->update([
+            ...Arr::except($validated, 'image'),
+            'image' => $request->hasFile('image')
+                ? PostImage::store($request->file('image'), $department->image)
+                : $department->image,
+        ]);
+
+        return back()->with('success', 'Department page saved.');
     }
 
     /**

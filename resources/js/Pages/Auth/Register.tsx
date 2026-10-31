@@ -25,7 +25,13 @@ const STEPS = [
 
 const FIELDS_BY_STEP = [
     ['full_name', 'gender', 'date_of_birth', 'phone', 'email', 'address'],
-    ['department_id', 'unit', 'date_joined'],
+    [
+        'department_id',
+        'unit',
+        'date_joined',
+        'foundation_certificate',
+        'wofbi_certificate',
+    ],
     ['next_of_kin_name', 'next_of_kin_relationship', 'next_of_kin_phone'],
 ];
 
@@ -69,6 +75,8 @@ export default function Register({
         date_joined: '',
         foundation_class_done: false,
         wofbi_done: false,
+        foundation_certificate: null,
+        wofbi_certificate: null,
         next_of_kin_name: '',
         next_of_kin_relationship: '',
         next_of_kin_phone: '+234',

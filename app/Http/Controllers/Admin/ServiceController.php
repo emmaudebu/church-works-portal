@@ -40,7 +40,7 @@ class ServiceController extends Controller
                     'department' => $service->department->name,
                     'accepting' => $service->acceptsCheckIns(),
                     'can_open' => $service->date->lte(today()),
-                    'can_delete' => $service->type === 'special' && $service->attendance_count === 0,
+                    'can_delete' => $service->recurring_key === null && $service->attendance_count === 0,
                 ]),
             'canCreate' => CurrentDepartment::idFor($admin) !== null,
         ]);
@@ -105,7 +105,7 @@ class ServiceController extends Controller
     public function destroy(Request $request, Service $service): RedirectResponse
     {
         abort_unless($request->user()->canAccessDepartment($service->department_id), 404);
-        abort_unless($service->type === 'special' && ! $service->attendance()->exists(), 422);
+        abort_unless($service->recurring_key === null && ! $service->attendance()->exists(), 422);
 
         $service->delete();
 

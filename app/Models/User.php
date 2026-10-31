@@ -19,7 +19,8 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable([
     'department_id', 'member_id', 'full_name', 'gender', 'date_of_birth', 'phone', 'email',
-    'address', 'photo', 'unit', 'date_joined', 'foundation_class_done', 'wofbi_done',
+    'address', 'photo', 'unit', 'date_joined', 'foundation_class_done', 'foundation_certificate',
+    'wofbi_done', 'wofbi_certificate',
     'password', 'status', 'suspension_reason',
 ])]
 #[Hidden(['password', 'remember_token', 'qr_token'])]

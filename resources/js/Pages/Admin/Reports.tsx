@@ -211,7 +211,7 @@ export default function Reports({
                                                 : `${member.rate}%`}
                                             <span className="block text-xs text-neutral-600">
                                                 {member.attended} of{' '}
-                                                {member.total}
+                                                {member.total} days
                                             </span>
                                         </td>
                                         <td className="p-2">
