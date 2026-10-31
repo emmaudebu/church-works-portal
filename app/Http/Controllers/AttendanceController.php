@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Election;
+use App\Models\Post;
 use App\Models\Service;
 use App\Support\AttendanceStats;
+use App\Support\Ballot;
 use App\Support\ServiceGenerator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -28,6 +31,7 @@ class AttendanceController extends Controller
         )[$user->id];
 
         $next = Service::whereIn('department_id', $departments)
+            ->whereDate('date', '>=', today())
             ->where('closes_at', '>=', now())
             ->orderBy('opens_at')
             ->first();
@@ -39,6 +43,26 @@ class AttendanceController extends Controller
                 'date_label' => $next->date->format('l j F'),
                 'time' => $next->opens_at->format('g:i A'),
             ] : null,
+            'openElection' => Election::where('department_id', $user->department_id)
+                ->where('starts_at', '<=', now())
+                ->where('ends_at', '>=', now())
+                ->with('positions')
+                ->get()
+                ->first(fn (Election $election) => Ballot::isEligible($election, $user) && ! Ballot::hasVoted($election, $user))
+                ?->only(['id', 'title']),
+            'announcements' => Post::visibleTo($user)
+                ->where('type', 'announcement')
+                ->latest('published_at')
+                ->limit(3)
+                ->get()
+                ->map->toCard(),
+            'events' => Post::visibleTo($user)
+                ->where('type', 'event')
+                ->where('event_date', '>=', now())
+                ->orderBy('event_date')
+                ->limit(3)
+                ->get()
+                ->map->toCard(),
         ]);
     }
 

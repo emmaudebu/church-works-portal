@@ -4,8 +4,12 @@ namespace Database\Seeders;
 
 use App\Models\Attendance;
 use App\Models\Department;
+use App\Models\Election;
+use App\Models\Post;
 use App\Models\Service;
 use App\Models\User;
+use App\Models\Vote;
+use App\Support\Ballot;
 use App\Support\ServiceGenerator;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
@@ -56,6 +60,78 @@ class DatabaseSeeder extends Seeder
 
         if (Attendance::doesntExist()) {
             $this->seedSampleAttendance($technicalUnit);
+        }
+
+        if (Post::doesntExist()) {
+            $this->seedSamplePosts($technicalUnit);
+        }
+
+        if (Election::doesntExist()) {
+            $this->seedSampleElections($technicalUnit);
+        }
+    }
+
+    /**
+     * One election open for voting and one finished with published results.
+     */
+    private function seedSampleElections(Department $department): void
+    {
+        $members = User::where('department_id', $department->id)->where('status', 'active')->get();
+
+        foreach ([
+            ['Unit Leadership Election', now()->subHour(), now()->addDays(7), false, ['Unit Head', 'Assistant Unit Head'], false],
+            ['Welfare Coordinator Election', now()->subMonth(), now()->subWeeks(3), true, ['Welfare Coordinator'], true],
+        ] as [$title, $startsAt, $endsAt, $public, $positions, $withVotes]) {
+            $election = Election::create([
+                'department_id' => $department->id,
+                'title' => $title,
+                'starts_at' => $startsAt,
+                'ends_at' => $endsAt,
+                'results_public' => $public,
+            ]);
+
+            foreach ($positions as $order => $positionTitle) {
+                $position = $election->positions()->create(['title' => $positionTitle, 'sort_order' => $order]);
+
+                $candidates = $members->random(3)->map(fn (User $member) => $position->candidates()->create([
+                    'user_id' => $member->id,
+                    'manifesto' => 'I will serve the unit faithfully and keep everyone informed.',
+                ]));
+
+                if ($withVotes) {
+                    foreach ($members as $member) {
+                        Vote::create([
+                            'position_id' => $position->id,
+                            'candidate_id' => $candidates->random()->id,
+                            'voter_hash' => Ballot::voterHash($member, $position->id),
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
+    private function seedSamplePosts(Department $department): void
+    {
+        $author = User::role('dept_admin')->first();
+
+        foreach ([
+            ['news', 'New sound desk installed', 'The main auditorium now has a new digital sound desk. Training starts soon.', null, null],
+            ['event', 'Technical Unit workshop', 'A hands-on workshop for all units. Please bring a notebook.', now()->addDays(9)->setTime(10, 0), 'Main Auditorium'],
+            ['event', 'Workforce retreat', 'A day of prayer and fellowship for the whole workforce.', now()->addDays(21)->setTime(9, 0), 'Faith Tabernacle Annex'],
+            ['announcement', 'Rehearsal moved to Saturday', 'This week rehearsal holds on Saturday at 4 PM.', null, null],
+            ['announcement', 'Update your details', 'Please make sure your next of kin details are current.', null, null],
+        ] as [$type, $title, $body, $eventDate, $venue]) {
+            Post::create([
+                'department_id' => $department->id,
+                'type' => $type,
+                'title' => $title,
+                'body' => "<p>{$body}</p>",
+                'event_date' => $eventDate,
+                'venue' => $venue,
+                'published_at' => now()->subDay(),
+                'author_id' => $author?->id,
+            ]);
         }
     }
 

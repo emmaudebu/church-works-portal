@@ -348,6 +348,24 @@ test('members only see their own attendance', function () {
         ->where('overall.attended', 0));
 });
 
+test('a past service reopened by an admin is not shown as the next service', function () {
+    Service::query()->delete();
+
+    $past = Service::factory()->finished(3)->create(['department_id' => $this->technical->id]);
+    $past->open();
+
+    $next = Service::factory()->create([
+        'department_id' => $this->technical->id,
+        'title' => 'Coming up',
+        'date' => today()->addDay(),
+        'opens_at' => now()->addDay(),
+        'closes_at' => now()->addDay()->addHour(),
+    ]);
+
+    $this->actingAs($this->member)->get('/home')
+        ->assertInertia(fn (Assert $page) => $page->where('nextService.title', $next->title));
+});
+
 test('the member home shows this month and the next service', function () {
     $this->actingAs($this->member)->get('/home')->assertInertia(fn (Assert $page) => $page
         ->component('Member/Home')

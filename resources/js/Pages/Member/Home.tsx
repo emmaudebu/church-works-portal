@@ -1,6 +1,7 @@
 import Avatar from '@/Components/Avatar';
+import PostCard from '@/Components/PostCard';
 import MemberLayout from '@/Layouts/MemberLayout';
-import { PageProps } from '@/types';
+import { PageProps, PostCard as PostCardData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 
 function AttendanceRing({ rate }: { rate: number | null }) {
@@ -44,9 +45,15 @@ function AttendanceRing({ rate }: { rate: number | null }) {
 export default function Home({
     month,
     nextService,
+    openElection,
+    announcements,
+    events,
 }: {
     month: { attended: number; total: number; rate: number | null };
     nextService: { title: string; date_label: string; time: string } | null;
+    openElection: { id: number; title: string } | null;
+    announcements: PostCardData[];
+    events: PostCardData[];
 }) {
     const { user } = usePage<PageProps>().props.auth;
 
@@ -69,6 +76,25 @@ export default function Home({
                     </p>
                 </div>
             </section>
+
+            {openElection && (
+                <section className="card mt-4 flex items-center justify-between gap-3 border-t-2 border-gold-500 p-5">
+                    <span className="min-w-0">
+                        <span className="block font-medium">
+                            {openElection.title}
+                        </span>
+                        <span className="text-sm text-neutral-600">
+                            Voting is open
+                        </span>
+                    </span>
+                    <Link
+                        href={route('member.elections.show', openElection.id)}
+                        className="shrink-0 rounded-lg bg-gold-500 px-4 py-2.5 text-sm font-semibold text-neutral-900 transition hover:bg-gold-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                    >
+                        Vote now
+                    </Link>
+                </section>
+            )}
 
             <Link
                 href={route('member.attendance')}
@@ -109,6 +135,44 @@ export default function Home({
                     </p>
                 )}
             </section>
+
+            <section className="mt-6">
+                <h2 className="text-xl">Announcements</h2>
+                {announcements.length === 0 ? (
+                    <p className="mt-2 text-sm text-neutral-600">
+                        No announcements right now.
+                    </p>
+                ) : (
+                    <ul className="mt-2 space-y-3">
+                        {announcements.map((post) => (
+                            <li key={post.id}>
+                                <Link
+                                    href={route('posts.show', post.id)}
+                                    className="card block border-l-2 border-gold-500 p-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                                >
+                                    <span className="block font-medium">
+                                        {post.title}
+                                    </span>
+                                    <span className="mt-1 block text-sm text-neutral-600">
+                                        {post.excerpt}
+                                    </span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+
+            {events.length > 0 && (
+                <section className="mt-6">
+                    <h2 className="text-xl">Upcoming events</h2>
+                    <div className="mt-2 space-y-3">
+                        {events.map((post) => (
+                            <PostCard key={post.id} post={post} />
+                        ))}
+                    </div>
+                </section>
+            )}
         </MemberLayout>
     );
 }

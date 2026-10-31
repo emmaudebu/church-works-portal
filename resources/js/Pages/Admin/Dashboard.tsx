@@ -86,13 +86,31 @@ export default function Dashboard({
                     <h1 className="text-3xl">Admin Dashboard</h1>
                     <div className="gold-rule" />
                 </div>
-                <Link
-                    href={route('admin.scanner')}
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
-                >
-                    <ScanLine size={20} strokeWidth={1.75} aria-hidden="true" />
-                    Start attendance
-                </Link>
+                <div className="flex flex-wrap gap-2">
+                    <Link
+                        href={route('admin.scanner')}
+                        className="inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                    >
+                        <ScanLine
+                            size={20}
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                        />
+                        Start attendance
+                    </Link>
+                    <Link
+                        href={route('admin.posts.create')}
+                        className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                    >
+                        New post
+                    </Link>
+                    <Link
+                        href={route('admin.elections')}
+                        className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                    >
+                        New election
+                    </Link>
+                </div>
             </div>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">

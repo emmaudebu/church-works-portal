@@ -2,22 +2,31 @@
 
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentController;
+use App\Http\Controllers\Admin\ElectionController as AdminElectionController;
 use App\Http\Controllers\Admin\MemberController;
 use App\Http\Controllers\Admin\MemberStatusController;
+use App\Http\Controllers\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\ScannerController;
 use App\Http\Controllers\Admin\ServiceController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\ElectionController;
 use App\Http\Controllers\PhotoController;
+use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\QrCodeController;
 use App\Models\Department;
+use App\Models\Post;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', fn () => Inertia::render('Welcome', [
     'departments' => Department::forDisplay()->get(),
+    'posts' => Post::publicFacing()->latest('published_at')->limit(3)->get()->map->toCard(),
 ]))->name('home');
+
+Route::get('/posts/{post}', [PostController::class, 'show'])->name('posts.show');
+Route::get('/posts/{post}/calendar', [PostController::class, 'calendar'])->name('posts.calendar');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', function () {
@@ -29,10 +38,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/my-qr', [QrCodeController::class, 'myQr'])->name('member.my-qr');
 
     // Placeholders so navigation works; each is replaced by its build step.
-    foreach (['events' => 'Events', 'elections' => 'Elections'] as $uri => $title) {
-        Route::get("/{$uri}", fn () => Inertia::render('Member/Placeholder', ['title' => $title]))
-            ->name('member.'.$uri);
-    }
+    Route::get('/events', [PostController::class, 'index'])->name('member.events');
+    Route::get('/elections', [ElectionController::class, 'index'])->name('member.elections');
+    Route::get('/elections/{election}', [ElectionController::class, 'show'])->name('member.elections.show');
+    Route::post('/elections/{election}/vote', [ElectionController::class, 'vote'])->name('member.elections.vote');
+    Route::get('/elections/{election}/results', [ElectionController::class, 'results'])->name('member.elections.results');
+    Route::get('/candidates/{candidate}/photo', [ElectionController::class, 'photo'])->name('candidates.photo');
 
     Route::prefix('admin')->name('admin.')->middleware('role:super_admin|dept_admin')->group(function () {
         Route::get('/', DashboardController::class)->name('dashboard');
@@ -64,9 +75,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/reports', [ReportController::class, 'index'])->name('reports');
         Route::get('/reports/export/{format}', [ReportController::class, 'export'])->name('reports.export');
 
-        foreach (['posts' => 'Posts', 'elections' => 'Elections'] as $uri => $title) {
-            Route::get("/{$uri}", fn () => Inertia::render('Admin/Placeholder', ['title' => $title]))->name($uri);
-        }
+        Route::get('/posts', [AdminPostController::class, 'index'])->name('posts');
+        Route::get('/posts/create', [AdminPostController::class, 'create'])->name('posts.create');
+        Route::post('/posts', [AdminPostController::class, 'store'])->name('posts.store');
+        Route::get('/posts/{post}/edit', [AdminPostController::class, 'edit'])->name('posts.edit');
+        Route::patch('/posts/{post}', [AdminPostController::class, 'update'])->name('posts.update');
+        Route::delete('/posts/{post}', [AdminPostController::class, 'destroy'])->name('posts.destroy');
+
+        Route::get('/elections', [AdminElectionController::class, 'index'])->name('elections');
+        Route::post('/elections', [AdminElectionController::class, 'store'])->name('elections.store');
+        Route::get('/elections/{election}', [AdminElectionController::class, 'show'])->name('elections.show');
+        Route::patch('/elections/{election}', [AdminElectionController::class, 'update'])->name('elections.update');
+        Route::delete('/elections/{election}', [AdminElectionController::class, 'destroy'])->name('elections.destroy');
+        Route::post('/elections/{election}/close', [AdminElectionController::class, 'close'])->name('elections.close');
+        Route::patch('/elections/{election}/results', [AdminElectionController::class, 'setResultsVisibility'])->name('elections.results');
+        Route::post('/elections/{election}/positions', [AdminElectionController::class, 'storePosition'])->name('positions.store');
+        Route::delete('/positions/{position}', [AdminElectionController::class, 'destroyPosition'])->name('positions.destroy');
+        Route::post('/positions/{position}/candidates', [AdminElectionController::class, 'storeCandidate'])->name('candidates.store');
+        Route::delete('/candidates/{candidate}', [AdminElectionController::class, 'destroyCandidate'])->name('candidates.destroy');
 
         Route::middleware('role:super_admin')->group(function () {
             Route::get('/departments', [DepartmentController::class, 'index'])->name('departments');

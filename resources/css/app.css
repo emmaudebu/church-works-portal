@@ -15,6 +15,35 @@
 }
 
 @layer components {
+    /* Formatting for post bodies, both in the editor and on the reading page. */
+    .rich > * + * {
+        @apply mt-3;
+    }
+
+    .rich h2 {
+        @apply text-2xl;
+    }
+
+    .rich h3 {
+        @apply text-xl;
+    }
+
+    .rich ul {
+        @apply list-disc pl-6;
+    }
+
+    .rich ol {
+        @apply list-decimal pl-6;
+    }
+
+    .rich blockquote {
+        @apply border-l-2 border-gold-500 pl-4 text-neutral-600;
+    }
+
+    .rich a {
+        @apply text-primary-700 underline;
+    }
+
     .card {
         @apply rounded-2xl bg-white shadow-soft;
     }

@@ -1,14 +1,17 @@
 import DepartmentCard from '@/Components/DepartmentCard';
 import EmptyState from '@/Components/EmptyState';
+import PostCard from '@/Components/PostCard';
 import PublicLayout from '@/Layouts/PublicLayout';
-import { Department } from '@/types';
+import { Department, PostCard as PostCardData } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Newspaper } from 'lucide-react';
 
 export default function Welcome({
     departments,
+    posts,
 }: {
     departments: Department[];
+    posts: PostCardData[];
 }) {
     return (
         <PublicLayout>
@@ -61,10 +64,18 @@ export default function Welcome({
                 >
                     <h2 className="text-3xl">News and Events</h2>
                     <div className="gold-rule mb-8" />
-                    <EmptyState
-                        icon={Newspaper}
-                        message="News and events will appear here soon."
-                    />
+                    {posts.length === 0 ? (
+                        <EmptyState
+                            icon={Newspaper}
+                            message="News and events will appear here soon."
+                        />
+                    ) : (
+                        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                            {posts.map((post) => (
+                                <PostCard key={post.id} post={post} />
+                            ))}
+                        </div>
+                    )}
                 </div>
             </section>
         </PublicLayout>

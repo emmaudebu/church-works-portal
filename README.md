@@ -17,6 +17,7 @@ cp .env.example .env
 php artisan key:generate
 mysql -uroot -e "CREATE DATABASE covenant_workforce; CREATE DATABASE covenant_workforce_test;"
 php artisan migrate --seed
+php artisan storage:link
 composer run dev
 ```
 
@@ -37,6 +38,10 @@ In production, set `SUPER_ADMIN_EMAIL` and `SUPER_ADMIN_PASSWORD` before seeding
 Sunday and Wednesday services are created automatically for active departments. Set their attendance windows with `SUNDAY_OPENS`, `SUNDAY_CLOSES`, `WEDNESDAY_OPENS` and `WEDNESDAY_CLOSES` in `.env`. In production, run `php artisan schedule:run` every minute from cron.
 
 The QR scanner needs camera access, which browsers only allow on `https` or `localhost`.
+
+## Elections
+
+Votes are stored with a hash of the voter and position, keyed with `APP_KEY`. Do not change `APP_KEY` while an election is open: the app would no longer recognise who has voted.
 
 ## Tests
 

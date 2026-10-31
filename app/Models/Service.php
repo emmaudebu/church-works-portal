@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Support\CurrentDepartment;
+use App\Models\Concerns\ManagedByDepartment;
 use Database\Factories\ServiceFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Service extends Model
 {
     /** @use HasFactory<ServiceFactory> */
-    use HasFactory;
+    use HasFactory, ManagedByDepartment;
 
     /**
      * Get the attributes that should be cast.
@@ -46,22 +46,6 @@ class Service extends Model
     public function attendance(): HasMany
     {
         return $this->hasMany(Attendance::class);
-    }
-
-    /**
-     * Limit a query to the services an admin works with.
-     *
-     * @param  Builder<Service>  $query
-     */
-    public function scopeManagedBy(Builder $query, User $admin): void
-    {
-        $departmentId = CurrentDepartment::idFor($admin);
-
-        if ($departmentId) {
-            $query->where('department_id', $departmentId);
-        } elseif (! $admin->hasRole('super_admin')) {
-            $query->whereRaw('1 = 0');
-        }
     }
 
     /**

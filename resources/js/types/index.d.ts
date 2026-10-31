@@ -94,6 +94,42 @@ export interface MemberRecord {
     profile: MemberProfile | null;
 }
 
+export interface PostCard {
+    id: number;
+    type: 'news' | 'event' | 'announcement';
+    title: string;
+    venue: string | null;
+    excerpt: string;
+    image_url: string | null;
+    day: string;
+    month: string;
+    date: string;
+    date_label: string;
+}
+
+export type ElectionStatus = 'upcoming' | 'open' | 'closed';
+
+export interface BallotCandidate {
+    id: number;
+    full_name: string;
+    unit: string | null;
+    manifesto: string | null;
+    photo_url: string | null;
+}
+
+export interface PositionResult {
+    id: number;
+    title: string;
+    total: number;
+    candidates: (BallotCandidate & { votes: number })[];
+}
+
+export interface Turnout {
+    voted: number;
+    eligible: number;
+    percent: number;
+}
+
 export type PageProps<
     T extends Record<string, unknown> = Record<string, unknown>,
 > = T & {
