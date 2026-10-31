@@ -238,6 +238,11 @@ export default function Register({
                                 ['Next of kin', data.next_of_kin_name],
                             ]}
                         />
+                        <p className="text-sm text-neutral-600">
+                            Once approved, your name, unit and photo can appear
+                            on your department's public page. You can turn this
+                            off in your profile.
+                        </p>
                         <div>
                             <InputLabel
                                 htmlFor="password"

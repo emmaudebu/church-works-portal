@@ -157,6 +157,116 @@ function BankForm({
     );
 }
 
+type PageContent = {
+    id: number;
+    description: string | null;
+    about: string | null;
+    image_url: string;
+};
+
+function PageForm({ department }: { department: PageContent }) {
+    const [preview, setPreview] = useState(department.image_url);
+
+    const form = useForm<{
+        description: string;
+        about: string;
+        image: File | null;
+    }>({
+        description: department.description ?? '',
+        about: department.about ?? '',
+        image: null,
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.post(route('admin.departments.page', department.id), {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => form.setData('image', null),
+        });
+    };
+
+    return (
+        <section className="card p-4 sm:p-6">
+            <h2 className="text-xl">Public page</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+                What visitors see on your department's page.
+            </p>
+
+            <form onSubmit={submit} className="mt-4 space-y-4">
+                <div>
+                    <label
+                        htmlFor="page-image"
+                        className="block text-sm font-medium"
+                    >
+                        Banner picture
+                    </label>
+                    <img
+                        src={preview}
+                        alt=""
+                        className="mt-1 h-40 w-full rounded-lg object-cover"
+                    />
+                    <input
+                        id="page-image"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(e) => {
+                            const file = e.target.files?.[0] ?? null;
+
+                            form.setData('image', file);
+
+                            if (file) {
+                                setPreview(URL.createObjectURL(file));
+                            }
+                        }}
+                        className="mt-2 block w-full text-sm"
+                    />
+                    <InputError message={form.errors.image} className="mt-2" />
+                </div>
+
+                <div>
+                    <InputLabel
+                        htmlFor="page-description"
+                        value="Short description"
+                    />
+                    <TextInput
+                        id="page-description"
+                        value={form.data.description}
+                        onChange={(e) =>
+                            form.setData('description', e.target.value)
+                        }
+                        className="mt-1 block w-full"
+                    />
+                    <InputError
+                        message={form.errors.description}
+                        className="mt-2"
+                    />
+                </div>
+
+                <div>
+                    <InputLabel
+                        htmlFor="page-about"
+                        value="About this department"
+                    />
+                    <textarea
+                        id="page-about"
+                        rows={6}
+                        value={form.data.about}
+                        onChange={(e) => form.setData('about', e.target.value)}
+                        className="mt-1 block w-full rounded-lg border-neutral-200 focus:border-primary-700 focus:ring-primary-700"
+                    />
+                    <InputError message={form.errors.about} className="mt-2" />
+                </div>
+
+                <PrimaryButton disabled={form.processing}>
+                    Save page
+                </PrimaryButton>
+            </form>
+        </section>
+    );
+}
+
 function GalleryItem({ image }: { image: GalleryImage }) {
     const [caption, setCaption] = useState(image.caption ?? '');
 
@@ -207,7 +317,7 @@ export default function DepartmentManage({
     units,
     images,
 }: {
-    department: { id: number; name: string; slug: string } & Bank;
+    department: { name: string; slug: string } & PageContent & Bank;
     canEditBank: boolean;
     units: Unit[];
     images: GalleryImage[];
@@ -260,6 +370,8 @@ export default function DepartmentManage({
             </div>
 
             <div className="mt-6 max-w-4xl space-y-6">
+                <PageForm department={department} />
+
                 <BankForm
                     departmentId={department.id}
                     bank={department}

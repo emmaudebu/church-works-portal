@@ -29,7 +29,10 @@ class DepartmentContentController extends Controller
         $counts = $department->users()->selectRaw('unit, count(*) as total')->groupBy('unit')->pluck('total', 'unit');
 
         return Inertia::render('Admin/DepartmentManage', [
-            'department' => $department->only(['id', 'name', 'slug', 'bank_name', 'account_number', 'account_name']),
+            'department' => [
+                ...$department->only(['id', 'name', 'slug', 'description', 'about', 'bank_name', 'account_number', 'account_name']),
+                'image_url' => $department->imageUrl(),
+            ],
             'canEditBank' => $request->user()->hasRole('super_admin'),
             'units' => $department->units->map(fn (Unit $unit) => [
                 'id' => $unit->id,

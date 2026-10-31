@@ -9,7 +9,9 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Spatie\Permission\Middleware\RoleMiddleware;
+use Symfony\Component\HttpFoundation\Response;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -37,4 +39,21 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );
+
+        // Friendly pages for visitors. Developers still see full details for
+        // server errors while debugging.
+        $exceptions->respond(function (Response $response, Throwable $exception, Request $request) {
+            $status = $response->getStatusCode();
+
+            $friendly = in_array($status, [403, 404])
+                || (in_array($status, [500, 503]) && ! config('app.debug'));
+
+            if (! $friendly || $request->expectsJson()) {
+                return $response;
+            }
+
+            return Inertia::render('Error', ['status' => $status])
+                ->toResponse($request)
+                ->setStatusCode($status);
+        });
     })->create();

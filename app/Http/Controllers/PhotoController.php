@@ -10,6 +10,21 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class PhotoController extends Controller
 {
     /**
+     * Serve a photo on a public department page. Everyone who hides themselves,
+     * or isn't an active member, stays private.
+     */
+    public function team(User $user): StreamedResponse
+    {
+        abort_unless($user->isActive() && $user->show_on_site && $user->photo, 404);
+        abort_unless(Storage::disk('local')->exists($user->photo), 404);
+
+        return Storage::disk('local')->response($user->photo, headers: [
+            'Cache-Control' => 'public, max-age=86400',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /**
      * Serve a passport photo to the member themselves or an admin who can view them.
      */
     public function show(Request $request, User $user): StreamedResponse

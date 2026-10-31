@@ -41,6 +41,42 @@ class Settings
         'version' => 1,
     ];
 
+    public const VERSE_POSITIONS = ['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right', 'random'];
+
+    /**
+     * King James Version, which is free to reuse.
+     */
+    public const DEFAULT_VERSE_TOAST = [
+        'enabled' => true,
+        'position' => 'bottom-right',
+        'first_delay' => 8,
+        'interval' => 60,
+        'duration' => 10,
+        'verses' => [
+            ['reference' => 'John 3:16', 'text' => 'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.'],
+            ['reference' => 'Psalm 23:1', 'text' => 'The LORD is my shepherd; I shall not want.'],
+            ['reference' => 'Philippians 4:13', 'text' => 'I can do all things through Christ which strengtheneth me.'],
+            ['reference' => 'Proverbs 3:5', 'text' => 'Trust in the LORD with all thine heart; and lean not unto thine own understanding.'],
+            ['reference' => 'Isaiah 40:31', 'text' => 'But they that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles; they shall run, and not be weary; and they shall walk, and not faint.'],
+            ['reference' => 'Romans 8:28', 'text' => 'And we know that all things work together for good to them that love God, to them who are the called according to his purpose.'],
+            ['reference' => 'Joshua 1:9', 'text' => 'Be strong and of a good courage; be not afraid, neither be thou dismayed: for the LORD thy God is with thee whithersoever thou goest.'],
+            ['reference' => 'Psalm 100:2', 'text' => 'Serve the LORD with gladness: come before his presence with singing.'],
+            ['reference' => 'Colossians 3:23', 'text' => 'And whatsoever ye do, do it heartily, as to the Lord, and not unto men;'],
+            ['reference' => 'Galatians 6:9', 'text' => 'And let us not be weary in well doing: for in due season we shall reap, if we faint not.'],
+            ['reference' => '1 Corinthians 15:58', 'text' => 'Therefore, my beloved brethren, be ye stedfast, unmoveable, always abounding in the work of the Lord, forasmuch as ye know that your labour is not in vain in the Lord.'],
+            ['reference' => 'Hebrews 11:1', 'text' => 'Now faith is the substance of things hoped for, the evidence of things not seen.'],
+            ['reference' => 'Matthew 5:16', 'text' => 'Let your light so shine before men, that they may see your good works, and glorify your Father which is in heaven.'],
+            ['reference' => 'Psalm 46:1', 'text' => 'God is our refuge and strength, a very present help in trouble.'],
+            ['reference' => 'Jeremiah 29:11', 'text' => 'For I know the thoughts that I think toward you, saith the LORD, thoughts of peace, and not of evil, to give you an expected end.'],
+            ['reference' => 'Romans 12:11', 'text' => 'Not slothful in business; fervent in spirit; serving the Lord;'],
+            ['reference' => '1 Peter 4:10', 'text' => 'As every man hath received the gift, even so minister the same one to another, as good stewards of the manifold grace of God.'],
+            ['reference' => 'Psalm 37:5', 'text' => 'Commit thy way unto the LORD; trust also in him; and he shall bring it to pass.'],
+            ['reference' => 'Philippians 4:19', 'text' => 'But my God shall supply all your need according to his riches in glory by Christ Jesus.'],
+            ['reference' => '2 Timothy 1:7', 'text' => 'For God hath not given us the spirit of fear; but of power, and of love, and of a sound mind.'],
+            ['reference' => 'Psalm 118:24', 'text' => 'This is the day which the LORD hath made; we will rejoice and be glad in it.'],
+        ],
+    ];
+
     public const DEFAULT_HOME = [
         'slides' => [
             [
@@ -183,6 +219,26 @@ class Settings
                 ? Storage::disk('public')->url($popup['image'])
                 : '/images/site/covenant-greetings.webp',
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function verseToast(): array
+    {
+        return [...self::DEFAULT_VERSE_TOAST, ...self::get('verse_toast', [])];
+    }
+
+    /**
+     * The toast as visitors receive it, or null when there is nothing to show.
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function publicVerseToast(): ?array
+    {
+        $toast = self::verseToast();
+
+        return $toast['enabled'] && $toast['verses'] !== [] ? $toast : null;
     }
 
     /**

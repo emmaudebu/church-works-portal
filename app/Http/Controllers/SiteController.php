@@ -6,6 +6,7 @@ use App\Models\Department;
 use App\Models\Post;
 use App\Models\Service;
 use App\Models\User;
+use App\Support\Offices;
 use App\Support\ServiceGenerator;
 use App\Support\Settings;
 use Illuminate\Http\Request;
@@ -74,10 +75,31 @@ class SiteController extends Controller
 
         $posts = Post::publicFacing()->where('department_id', $department->id);
 
+        $people = $department->users()->where('status', 'active')->with('roles:id,name')->orderBy('full_name')->get();
+
+        $officers = $people->filter->isOfficer()
+            ->sortBy(fn (User $user) => array_search($user->getRoleNames()->first(), Offices::roles()))
+            ->values();
+
         return Inertia::render('Site/Department', [
             'department' => $department->toCard(),
             'units' => $department->units->pluck('name'),
             'gallery' => $department->images->map->toCard(),
+            'officers' => $officers->map(fn (User $user) => [
+                'id' => $user->id,
+                'full_name' => $user->full_name,
+                'office' => $user->office(),
+                'photo_url' => $user->publicPhotoUrl(),
+            ]),
+            'team' => $people->reject->isOfficer()
+                ->where('show_on_site', true)
+                ->values()
+                ->map(fn (User $user) => [
+                    'id' => $user->id,
+                    'full_name' => $user->full_name,
+                    'unit' => $user->unit,
+                    'photo_url' => $user->publicPhotoUrl(),
+                ]),
             'events' => (clone $posts)->where('type', 'event')->where('event_date', '>=', now())
                 ->orderBy('event_date')->limit(3)->get()->map->toCard(),
             'news' => (clone $posts)->where('type', 'news')->latest('published_at')->limit(3)->get()->map->toCard(),

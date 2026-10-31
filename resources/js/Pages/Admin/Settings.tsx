@@ -3,10 +3,11 @@ import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SitePopup from '@/Components/Site/SitePopup';
+import VerseToast from '@/Components/Site/VerseToast';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { HomeContent, HomeSlide, PageProps, SitePopupData } from '@/types';
+import { HomeContent, HomeSlide, PageProps, SitePopupData, VerseToastData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler, PropsWithChildren, useState } from 'react';
 
@@ -756,6 +757,131 @@ function HomepageForm({ home }: { home: HomeContent }) {
     );
 }
 
+function VerseToastForm({ toast }: { toast: VerseToastData }) {
+    const [preview, setPreview] = useState(0);
+
+    const form = useForm({
+        enabled: toast.enabled,
+        position: toast.position,
+        first_delay: String(toast.first_delay),
+        interval: String(toast.interval),
+        duration: String(toast.duration),
+        verses: toast.verses
+            .map((verse) => `${verse.reference} | ${verse.text}`)
+            .join('\n'),
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.put(route('admin.settings.verses'), { preserveScroll: true });
+    };
+
+    const numbers = [
+        ['first_delay', 'First verse after (seconds)'],
+        ['interval', 'Next verse every (seconds)'],
+        ['duration', 'Stays on screen (seconds)'],
+    ] as const;
+
+    return (
+        <Panel
+            title="Bible verse toast"
+            description="Random verses that slide in on the public website and member pages. Visitors can close them."
+        >
+            <form onSubmit={submit} className="space-y-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                    <input
+                        type="checkbox"
+                        role="switch"
+                        checked={form.data.enabled}
+                        onChange={(e) =>
+                            form.setData('enabled', e.target.checked)
+                        }
+                        className="rounded border-neutral-200 text-primary-700 focus:ring-primary-700"
+                    />
+                    Show verses
+                </label>
+
+                <div>
+                    <InputLabel htmlFor="verse_position" value="Where it appears" />
+                    <select
+                        id="verse_position"
+                        value={form.data.position}
+                        onChange={(e) =>
+                            form.setData('position', e.target.value)
+                        }
+                        className={textareaClass}
+                    >
+                        <option value="top-left">Top left</option>
+                        <option value="top-center">Top centre</option>
+                        <option value="top-right">Top right</option>
+                        <option value="bottom-left">Bottom left</option>
+                        <option value="bottom-center">Bottom centre</option>
+                        <option value="bottom-right">Bottom right</option>
+                        <option value="random">A different corner each time</option>
+                    </select>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                    {numbers.map(([name, label]) => (
+                        <div key={name}>
+                            <InputLabel htmlFor={name} value={label} />
+                            <TextInput
+                                id={name}
+                                type="number"
+                                value={form.data[name]}
+                                onChange={(e) =>
+                                    form.setData(name, e.target.value)
+                                }
+                                required
+                                className="mt-1 block w-full"
+                            />
+                            <InputError
+                                message={form.errors[name]}
+                                className="mt-2"
+                            />
+                        </div>
+                    ))}
+                </div>
+
+                <div>
+                    <InputLabel
+                        htmlFor="verses"
+                        value="Verses, one per line: Reference | Verse text"
+                    />
+                    <textarea
+                        id="verses"
+                        rows={10}
+                        value={form.data.verses}
+                        onChange={(e) =>
+                            form.setData('verses', e.target.value)
+                        }
+                        className={textareaClass}
+                    />
+                    <InputError message={form.errors.verses} className="mt-2" />
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                    <PrimaryButton disabled={form.processing}>
+                        Save
+                    </PrimaryButton>
+                    <SecondaryButton onClick={() => setPreview(preview + 1)}>
+                        Preview
+                    </SecondaryButton>
+                </div>
+            </form>
+
+            {preview > 0 && (
+                <VerseToast
+                    key={preview}
+                    preview
+                    toast={{ ...toast, position: form.data.position }}
+                />
+            )}
+        </Panel>
+    );
+}
+
 function PopupForm({ popup }: { popup: SitePopupData }) {
     const form = useForm<{
         enabled: boolean;
@@ -1387,6 +1513,7 @@ export default function Settings({
     services,
     whatsapp,
     popup,
+    verseToast,
     home,
     paystack,
     offices,
@@ -1400,6 +1527,7 @@ export default function Settings({
     services: RecurringService[];
     whatsapp: { greeting: string; temp_password: string };
     popup: SitePopupData;
+    verseToast: VerseToastData;
     home: HomeContent;
     paystack: PaystackSettings;
     offices: OfficeRow[];
@@ -1420,6 +1548,7 @@ export default function Settings({
                 <ColorsForm colors={colors} defaults={defaultColors} />
                 <HomepageForm home={home} />
                 <PopupForm popup={popup} />
+                <VerseToastForm toast={verseToast} />
                 <ServicesForm services={services} />
                 <PermissionsForm offices={offices} labels={permissionLabels} />
                 <RolesPanel

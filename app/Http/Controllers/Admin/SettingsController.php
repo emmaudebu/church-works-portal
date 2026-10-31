@@ -43,6 +43,7 @@ class SettingsController extends Controller
             'whatsapp' => Settings::whatsapp(),
             'popup' => Settings::presentPopup(Settings::popup()),
             'home' => Settings::presentHome(),
+            'verseToast' => Settings::verseToast(),
             'paystack' => [
                 'public_key' => Settings::get('paystack_public'),
                 'configured' => Paystack::isConfigured(),
@@ -246,6 +247,40 @@ class SettingsController extends Controller
         }
 
         return back()->with('success', 'Payment keys saved.');
+    }
+
+    /**
+     * Save the Bible verse toast. Verses are typed one per line as
+     * "Reference | Verse text".
+     */
+    public function updateVerseToast(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'enabled' => ['required', 'boolean'],
+            'position' => ['required', Rule::in(Settings::VERSE_POSITIONS)],
+            'first_delay' => ['required', 'integer', 'min:1', 'max:600'],
+            'interval' => ['required', 'integer', 'min:15', 'max:3600'],
+            'duration' => ['required', 'integer', 'min:4', 'max:60'],
+            'verses' => ['required', 'string', 'max:50000'],
+        ]);
+
+        $verses = [];
+
+        foreach (preg_split('/\R/', $validated['verses'], flags: PREG_SPLIT_NO_EMPTY) as $number => $line) {
+            $parts = array_map('trim', explode('|', $line, 2));
+
+            if (count($parts) !== 2 || $parts[0] === '' || $parts[1] === '') {
+                throw ValidationException::withMessages([
+                    'verses' => 'Line '.($number + 1).' needs a reference and a verse, like: John 3:16 | For God so loved the world',
+                ]);
+            }
+
+            $verses[] = ['reference' => $parts[0], 'text' => $parts[1]];
+        }
+
+        Settings::set('verse_toast', [...$validated, 'verses' => $verses]);
+
+        return back()->with('success', 'Verse toast saved.');
     }
 
     /**

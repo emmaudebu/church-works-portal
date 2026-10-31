@@ -119,12 +119,19 @@ class DepartmentController extends Controller
 
     /**
      * Save the description, story and picture shown on the department's page.
+     * Its name and icon appear across the site, so those stay with super admins.
      */
     public function updatePage(Request $request, Department $department): RedirectResponse
     {
+        $admin = $request->user();
+
+        abort_unless($admin->canAccessDepartment($department->id), 404);
+
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100', Rule::unique('departments')->ignore($department)],
-            'icon' => ['required', Rule::in(Department::ICONS)],
+            ...($admin->hasRole('super_admin') ? [
+                'name' => ['required', 'string', 'max:100', Rule::unique('departments')->ignore($department)],
+                'icon' => ['required', Rule::in(Department::ICONS)],
+            ] : []),
             'description' => ['nullable', 'string', 'max:255'],
             'about' => ['nullable', 'string', 'max:3000'],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],

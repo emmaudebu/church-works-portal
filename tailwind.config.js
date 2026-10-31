@@ -75,6 +75,38 @@ export default {
                     from: { opacity: 0 },
                     to: { opacity: 1 },
                 },
+                'word-in': {
+                    from: { opacity: 0, transform: 'translateY(14px)', filter: 'blur(6px)' },
+                    to: { opacity: 1, transform: 'none', filter: 'blur(0)' },
+                },
+                shimmer: {
+                    from: { backgroundPosition: '200% center' },
+                    to: { backgroundPosition: '-200% center' },
+                },
+                glow: {
+                    '0%, 100%': { opacity: 0.35, transform: 'scale(1)' },
+                    '50%': { opacity: 0.7, transform: 'scale(1.15)' },
+                },
+                'toast-left': {
+                    from: { opacity: 0, transform: 'translateX(-60px) scale(0.96)' },
+                    to: { opacity: 1, transform: 'none' },
+                },
+                'toast-right': {
+                    from: { opacity: 0, transform: 'translateX(60px) scale(0.96)' },
+                    to: { opacity: 1, transform: 'none' },
+                },
+                'toast-top': {
+                    from: { opacity: 0, transform: 'translateY(-40px) scale(0.96)' },
+                    to: { opacity: 1, transform: 'none' },
+                },
+                'toast-bottom': {
+                    from: { opacity: 0, transform: 'translateY(40px) scale(0.96)' },
+                    to: { opacity: 1, transform: 'none' },
+                },
+                'toast-timer': {
+                    from: { transform: 'scaleX(1)' },
+                    to: { transform: 'scaleX(0)' },
+                },
                 'popup-zoom': {
                     from: { opacity: 0, transform: 'scale(0.7)' },
                     to: { opacity: 1, transform: 'none' },
@@ -109,6 +141,14 @@ export default {
                 'fade-up': 'fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both',
                 'page-in': 'page-in 0.45s ease-out both',
                 'popup-fade': 'page-in 0.6s ease-out both',
+                'word-in': 'word-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',
+                shimmer: 'shimmer 6s linear infinite',
+                glow: 'glow 4s ease-in-out infinite',
+                'toast-left': 'toast-left 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+                'toast-right': 'toast-right 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+                'toast-top': 'toast-top 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+                'toast-bottom': 'toast-bottom 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
+                'toast-timer': 'toast-timer linear both',
                 'popup-zoom': 'popup-zoom 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',
                 'popup-slide-up': 'popup-slide-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',
                 'popup-slide-down': 'popup-slide-down 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',

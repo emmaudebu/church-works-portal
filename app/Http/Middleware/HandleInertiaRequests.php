@@ -58,6 +58,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'branding' => fn () => Settings::branding(),
             'popup' => fn () => Settings::publicPopup(),
+            'verseToast' => fn () => Settings::publicVerseToast(),
             'whatsappTemplates' => fn () => $request->user()?->isAdmin() ? Settings::whatsapp() : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

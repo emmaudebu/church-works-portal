@@ -23,7 +23,7 @@ use Spatie\Permission\Traits\HasRoles;
     'department_id', 'member_id', 'full_name', 'gender', 'date_of_birth', 'phone', 'email',
     'address', 'photo', 'unit', 'date_joined', 'foundation_class_done', 'foundation_certificate',
     'wofbi_done', 'wofbi_certificate',
-    'password', 'status', 'suspension_reason',
+    'password', 'status', 'suspension_reason', 'show_on_site',
 ])]
 #[Hidden(['password', 'remember_token', 'qr_token'])]
 class User extends Authenticatable
@@ -56,6 +56,7 @@ class User extends Authenticatable
             'foundation_class_done' => 'boolean',
             'wofbi_done' => 'boolean',
             'must_change_password' => 'boolean',
+            'show_on_site' => 'boolean',
         ];
     }
 
@@ -159,6 +160,16 @@ class User extends Authenticatable
     public function photoUrl(): ?string
     {
         return $this->photo ? route('photos.show', ['user' => $this->id, 'v' => substr(md5($this->photo), 0, 8)]) : null;
+    }
+
+    /**
+     * The photo address for public pages, only for those who allow it.
+     */
+    public function publicPhotoUrl(): ?string
+    {
+        return $this->photo && $this->show_on_site
+            ? route('team.photo', ['user' => $this->id, 'v' => substr(md5($this->photo), 0, 8)])
+            : null;
     }
 
     /**

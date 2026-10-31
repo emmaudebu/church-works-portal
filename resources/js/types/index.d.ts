@@ -63,6 +63,15 @@ export interface GalleryImage {
     url: string;
 }
 
+export interface VerseToastData {
+    enabled: boolean;
+    position: string;
+    first_delay: number;
+    interval: number;
+    duration: number;
+    verses: { reference: string; text: string }[];
+}
+
 export interface SitePopupData {
     enabled: boolean;
     image_url: string;
@@ -192,6 +201,7 @@ export type PageProps<
     departmentContext: DepartmentContext | null;
     branding: Branding;
     popup: SitePopupData | null;
+    verseToast: VerseToastData | null;
     whatsappTemplates: { greeting: string; temp_password: string } | null;
     flash: {
         success: string | null;

@@ -311,6 +311,57 @@ test('only super admins can change the homepage', function () {
     $this->actingAs($this->admin)->post(route('admin.settings.home'), homeSettings())->assertForbidden();
 });
 
+function verseSettings(array $overrides = []): array
+{
+    return [
+        'enabled' => true,
+        'position' => 'top-left',
+        'first_delay' => 5,
+        'interval' => 30,
+        'duration' => 8,
+        'verses' => "John 3:16 | For God so loved the world\nPsalm 23:1 | The LORD is my shepherd",
+        ...$overrides,
+    ];
+}
+
+test('visitors receive the verse toast by default', function () {
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('verseToast.position', 'bottom-right')
+        ->where('verseToast.verses.0.reference', 'John 3:16'));
+});
+
+test('position, timing and verses can be changed', function () {
+    $this->actingAs($this->superAdmin)->put(route('admin.settings.verses'), verseSettings())->assertSessionHasNoErrors();
+
+    expect(Settings::verseToast())->toMatchArray(['position' => 'top-left', 'interval' => 30])
+        ->and(Settings::verseToast()['verses'])->toEqual([
+            ['reference' => 'John 3:16', 'text' => 'For God so loved the world'],
+            ['reference' => 'Psalm 23:1', 'text' => 'The LORD is my shepherd'],
+        ]);
+});
+
+test('the verse toast can be switched off', function () {
+    $this->actingAs($this->superAdmin)->put(route('admin.settings.verses'), verseSettings(['enabled' => false]));
+
+    $this->post('/logout');
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page->where('verseToast', null));
+});
+
+test('a verse line without a reference is refused with its line number', function () {
+    $this->actingAs($this->superAdmin)->put(route('admin.settings.verses'), verseSettings(['verses' => "John 3:16 | Fine\nNo separator here"]))
+        ->assertSessionHasErrors(['verses' => 'Line 2 needs a reference and a verse, like: John 3:16 | For God so loved the world']);
+});
+
+test('an unknown position or too-frequent interval is refused', function () {
+    $this->actingAs($this->superAdmin)->put(route('admin.settings.verses'), verseSettings(['position' => 'middle', 'interval' => 2]))
+        ->assertSessionHasErrors(['position', 'interval']);
+});
+
+test('only super admins can change the verse toast', function () {
+    $this->actingAs($this->admin)->put(route('admin.settings.verses'), verseSettings())->assertForbidden();
+});
+
 function popupSettings(array $overrides = []): array
 {
     return [

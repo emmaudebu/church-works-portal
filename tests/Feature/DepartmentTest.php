@@ -68,6 +68,63 @@ test('a department page does not count suspended members', function () {
         ->assertInertia(fn (Assert $page) => $page->where('department.members_count', 0));
 });
 
+test('the department page shows officers first and active members in the team', function () {
+    $head = User::factory()->create(['department_id' => $this->technical->id, 'full_name' => 'Head Person'])->assignRole('dept_admin');
+    $treasurer = User::factory()->create(['department_id' => $this->technical->id])->assignRole('treasurer');
+    $member = User::factory()->create(['department_id' => $this->technical->id, 'photo' => 'photos/a.jpg'])->assignRole('member');
+    User::factory()->create(['department_id' => $this->technical->id, 'show_on_site' => false])->assignRole('member');
+    User::factory()->pending()->create(['department_id' => $this->technical->id])->assignRole('member');
+    User::factory()->suspended()->create(['department_id' => $this->technical->id])->assignRole('member');
+
+    $this->get(route('departments.show', 'technical-unit'))->assertInertia(fn (Assert $page) => $page
+        ->has('officers', 2)
+        ->where('officers.0.id', $head->id)
+        ->where('officers.0.office', 'Head of Department')
+        ->where('officers.1.id', $treasurer->id)
+        ->has('team', 1)
+        ->where('team.0.id', $member->id)
+        ->missing('team.0.phone')
+        ->missing('team.0.email')
+        ->missing('officers.0.phone'));
+});
+
+test('public photos only exist for active members who allow it', function () {
+    Storage::fake('local');
+    Storage::disk('local')->put('photos/a.jpg', 'image');
+
+    $member = User::factory()->create(['department_id' => $this->technical->id, 'photo' => 'photos/a.jpg']);
+
+    $this->get(route('team.photo', $member))->assertOk();
+
+    $member->update(['show_on_site' => false]);
+    $this->get(route('team.photo', $member))->assertNotFound();
+
+    expect($member->fresh()->publicPhotoUrl())->toBeNull();
+
+    $member->update(['show_on_site' => true, 'status' => 'suspended']);
+    $this->get(route('team.photo', $member))->assertNotFound();
+});
+
+test('an officer who hides themselves keeps their name but not their photo', function () {
+    $head = User::factory()->create(['department_id' => $this->technical->id, 'photo' => 'photos/a.jpg', 'show_on_site' => false])->assignRole('dept_admin');
+
+    $this->get(route('departments.show', 'technical-unit'))->assertInertia(fn (Assert $page) => $page
+        ->where('officers.0.full_name', $head->full_name)
+        ->where('officers.0.photo_url', null));
+});
+
+test('a member can hide themselves from their profile', function () {
+    $member = User::factory()->create(['department_id' => $this->technical->id])->assignRole('member');
+
+    $this->actingAs($member)->patch('/profile', [
+        'full_name' => 'A', 'gender' => 'male', 'date_of_birth' => '1990-01-01', 'phone' => $member->phone, 'email' => $member->email,
+        'address' => 'B', 'unit' => 'Sound', 'next_of_kin_name' => 'C', 'next_of_kin_relationship' => 'D', 'next_of_kin_phone' => '08011112222',
+        'show_on_site' => false,
+    ])->assertSessionHasNoErrors();
+
+    expect($member->fresh()->show_on_site)->toBeFalse();
+});
+
 test('a super admin can write a department page and upload its picture', function () {
     Storage::fake('public');
 
@@ -89,10 +146,59 @@ test('a super admin can write a department page and upload its picture', functio
     expect($this->technical->fresh()->image)->toBe($department->image);
 });
 
-test('department admins can not edit department pages', function () {
-    $admin = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+test('a head of department edits their own page but not its name or icon', function () {
+    Storage::fake('public');
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+    $image = $this->technical->image;
 
-    $this->actingAs($admin)->post(route('admin.departments.page', $this->technical), ['about' => 'x'])->assertForbidden();
+    $this->actingAs($head)->post(route('admin.departments.page', $this->technical), [
+        'name' => 'Hacked', 'icon' => 'mic', 'description' => 'Fresh line', 'about' => 'Our new story',
+        'image' => UploadedFile::fake()->image('team.jpg', 1000, 600),
+    ])->assertSessionHasNoErrors();
+
+    $department = $this->technical->fresh();
+
+    expect($department->about)->toBe('Our new story')
+        ->and($department->description)->toBe('Fresh line')
+        ->and($department->name)->toBe('Technical Unit')
+        ->and($department->icon)->toBe('monitor-speaker')
+        ->and($department->image)->not->toBe($image);
+
+    Storage::disk('public')->assertExists($department->image);
+});
+
+test('saving a page without a new picture keeps the banner', function () {
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+    $this->technical->update(['image' => 'gallery/keep.jpg']);
+
+    $this->actingAs($head)->post(route('admin.departments.page', $this->technical), ['about' => 'Edited', 'image' => null])
+        ->assertSessionHasNoErrors();
+
+    expect($this->technical->fresh()->image)->toBe('gallery/keep.jpg');
+});
+
+test('a head can not edit another department page', function () {
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+    $choir = Department::firstWhere('slug', 'choir');
+
+    $this->actingAs($head)->post(route('admin.departments.page', $choir), ['about' => 'Taken over'])->assertNotFound();
+
+    expect($choir->fresh()->about)->not->toBe('Taken over');
+});
+
+test('offices without the permission and members can not edit the page', function () {
+    $treasurer = User::factory()->create(['department_id' => $this->technical->id])->assignRole('treasurer');
+    $member = User::factory()->create(['department_id' => $this->technical->id])->assignRole('member');
+
+    $this->actingAs($treasurer)->post(route('admin.departments.page', $this->technical), ['about' => 'x'])->assertForbidden();
+    $this->actingAs($member)->post(route('admin.departments.page', $this->technical), ['about' => 'x'])->assertForbidden();
+});
+
+test('a vice head can edit the page by default', function () {
+    $vice = User::factory()->create(['department_id' => $this->technical->id])->assignRole('vice_head');
+
+    $this->actingAs($vice)->post(route('admin.departments.page', $this->technical), ['about' => 'From the vice'])
+        ->assertSessionHasNoErrors();
 });
 
 test('a super admin can create a department', function () {

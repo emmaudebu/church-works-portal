@@ -27,6 +27,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [SiteController::class, 'home'])->name('home');
 Route::get('/departments', [SiteController::class, 'departments'])->name('departments');
 Route::get('/departments/{department:slug}', [SiteController::class, 'department'])->name('departments.show');
+Route::get('/team/{user}/photo', [PhotoController::class, 'team'])->name('team.photo');
 Route::get('/news', [SiteController::class, 'news'])->name('news');
 Route::post('/paystack/webhook', [PaymentController::class, 'webhook'])->name('paystack.webhook');
 
@@ -59,6 +60,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', DashboardController::class)->name('dashboard');
 
         Route::get('/departments/{department}/manage', [DepartmentContentController::class, 'show'])->name('departments.manage')->middleware('office:manage_department');
+        Route::post('/departments/{department}/page', [DepartmentController::class, 'updatePage'])->name('departments.page')->middleware('office:manage_department');
         Route::post('/departments/{department}/units', [DepartmentContentController::class, 'storeUnit'])->name('units.store')->middleware('office:manage_department');
         Route::patch('/units/{unit}', [DepartmentContentController::class, 'updateUnit'])->name('units.update')->middleware('office:manage_department');
         Route::delete('/units/{unit}', [DepartmentContentController::class, 'destroyUnit'])->name('units.destroy')->middleware('office:manage_department');
@@ -127,7 +129,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
             Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
             Route::patch('/departments/{department}/bank', [DepartmentController::class, 'updateBank'])->name('departments.bank');
-            Route::post('/departments/{department}/page', [DepartmentController::class, 'updatePage'])->name('departments.page');
             Route::post('/departments/{department}/admins', [DepartmentController::class, 'assignAdmin'])->name('departments.admins.store');
             Route::delete('/departments/{department}/admins/{user}', [DepartmentController::class, 'removeAdmin'])->name('departments.admins.destroy');
             Route::post('/current-department', [DepartmentController::class, 'switch'])->name('current-department');
@@ -137,6 +138,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::put('/settings/colors', [SettingsController::class, 'updateColors'])->name('settings.colors');
             Route::put('/settings/services', [SettingsController::class, 'updateServices'])->name('settings.services');
             Route::post('/settings/home', [SettingsController::class, 'updateHome'])->name('settings.home');
+            Route::put('/settings/verses', [SettingsController::class, 'updateVerseToast'])->name('settings.verses');
             Route::post('/settings/popup', [SettingsController::class, 'updatePopup'])->name('settings.popup');
             Route::post('/settings/paystack', [SettingsController::class, 'updatePaystack'])->name('settings.paystack');
             Route::put('/settings/whatsapp', [SettingsController::class, 'updateWhatsapp'])->name('settings.whatsapp');
@@ -161,3 +163,7 @@ Route::middleware('auth')->group(function () {
 });
 
 require __DIR__.'/auth.php';
+
+// Sends unknown addresses through the web middleware so the error page has
+// the church's name and logo.
+Route::fallback(fn () => abort(404));

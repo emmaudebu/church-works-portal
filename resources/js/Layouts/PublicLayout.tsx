@@ -1,5 +1,6 @@
 import Logo from '@/Components/Logo';
 import SitePopup from '@/Components/Site/SitePopup';
+import VerseToast from '@/Components/Site/VerseToast';
 import { PageProps } from '@/types';
 import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react';
 import { Link, usePage } from '@inertiajs/react';
@@ -14,7 +15,7 @@ export default function PublicLayout({
     topBar,
 }: PropsWithChildren<{ topBar?: ReactNode }>) {
     const { props, url } = usePage<PageProps>();
-    const { auth, branding, popup } = props;
+    const { auth, branding, popup, verseToast } = props;
     const { user } = auth;
     const [open, setOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
@@ -137,6 +138,7 @@ export default function PublicLayout({
             </Dialog>
 
             {popup && <SitePopup popup={popup} />}
+            {verseToast && <VerseToast toast={verseToast} />}
 
             <main key={url} className="flex-1 animate-page-in">
                 {children}

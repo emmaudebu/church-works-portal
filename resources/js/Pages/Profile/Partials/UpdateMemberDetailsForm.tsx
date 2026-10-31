@@ -20,15 +20,23 @@ export default function UpdateMemberDetailsForm({
     member: Parameters<typeof bioDataFrom>[0] & {
         certificate_urls: { foundation: string | null; wofbi: string | null };
         units: string[];
+        show_on_site: boolean;
     };
 }) {
     const { user } = usePage<PageProps>().props.auth;
 
     const { data, setData, post, errors, processing, recentlySuccessful } =
-        useForm<BioData & { _method: string; photo: File | null }>({
+        useForm<
+            BioData & {
+                _method: string;
+                photo: File | null;
+                show_on_site: boolean;
+            }
+        >({
             ...bioDataFrom(member),
             _method: 'patch',
             photo: null,
+            show_on_site: member.show_on_site,
         });
 
     const form: BioFormProps = {
@@ -63,6 +71,23 @@ export default function UpdateMemberDetailsForm({
             />
             <EmergencyFields form={form} />
             <ExtraFields form={form} />
+            <label className="flex items-start gap-2 text-sm">
+                <input
+                    type="checkbox"
+                    checked={data.show_on_site}
+                    onChange={(e) => setData('show_on_site', e.target.checked)}
+                    className="mt-0.5 rounded border-neutral-200 text-primary-700 focus:ring-primary-700"
+                />
+                <span>
+                    <span className="block font-medium">
+                        Show me on my department page
+                    </span>
+                    <span className="text-neutral-600">
+                        Your name, unit and photo can appear on the public
+                        website. Your contact details never do.
+                    </span>
+                </span>
+            </label>
             <div className="flex items-center gap-4">
                 <PrimaryButton disabled={processing}>Save</PrimaryButton>
                 <Transition

@@ -1,5 +1,6 @@
 import Avatar from '@/Components/Avatar';
 import Logo from '@/Components/Logo';
+import VerseToast from '@/Components/Site/VerseToast';
 import Toast from '@/Components/Toast';
 import { PageProps } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
@@ -42,7 +43,8 @@ export default function MemberLayout({
     children,
     wide = false,
 }: PropsWithChildren<{ wide?: boolean }>) {
-    const { user } = usePage<PageProps>().props.auth;
+    const { auth, verseToast } = usePage<PageProps>().props;
+    const { user } = auth;
     const width = wide ? 'max-w-6xl' : 'max-w-3xl';
 
     return (
@@ -154,6 +156,7 @@ export default function MemberLayout({
                 </header>
 
                 <Toast />
+                {verseToast && <VerseToast toast={verseToast} raised />}
 
                 <main className={`mx-auto px-4 py-6 lg:px-8 ${width}`}>
                     {children}

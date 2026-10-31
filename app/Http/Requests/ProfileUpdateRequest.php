@@ -31,6 +31,7 @@ class ProfileUpdateRequest extends MemberRequest
             ...MemberRules::certificates($user),
             ...MemberRules::emergencyAndExtra(),
             'photo' => ['nullable', ...MemberRules::photo()],
+            'show_on_site' => ['boolean'],
         ];
     }
 }
