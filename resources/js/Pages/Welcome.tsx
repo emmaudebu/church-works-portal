@@ -1,7 +1,15 @@
+import DepartmentCard from '@/Components/DepartmentCard';
+import EmptyState from '@/Components/EmptyState';
 import PublicLayout from '@/Layouts/PublicLayout';
+import { Department } from '@/types';
 import { Head, Link } from '@inertiajs/react';
+import { Newspaper } from 'lucide-react';
 
-export default function Welcome() {
+export default function Welcome({
+    departments,
+}: {
+    departments: Department[];
+}) {
     return (
         <PublicLayout>
             <Head title="Serving with Excellence" />
@@ -27,6 +35,36 @@ export default function Welcome() {
                     >
                         Login
                     </Link>
+                </div>
+            </section>
+
+            <section
+                id="departments"
+                className="mx-auto max-w-6xl scroll-mt-4 px-4 py-14 md:px-8"
+            >
+                <h2 className="text-3xl">Our Departments</h2>
+                <div className="gold-rule mb-8" />
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                    {departments.map((department) => (
+                        <DepartmentCard
+                            key={department.id}
+                            department={department}
+                        />
+                    ))}
+                </div>
+            </section>
+
+            <section className="bg-neutral-50">
+                <div
+                    id="news"
+                    className="mx-auto max-w-6xl scroll-mt-4 px-4 py-14 md:px-8"
+                >
+                    <h2 className="text-3xl">News and Events</h2>
+                    <div className="gold-rule mb-8" />
+                    <EmptyState
+                        icon={Newspaper}
+                        message="News and events will appear here soon."
+                    />
                 </div>
             </section>
         </PublicLayout>

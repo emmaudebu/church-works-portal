@@ -3,11 +3,11 @@
 namespace App\Http\Requests;
 
 use App\Models\User;
+use App\Support\MemberRules;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class ProfileUpdateRequest extends FormRequest
+class ProfileUpdateRequest extends MemberRequest
 {
     /**
      * Get the validation rules that apply to the request.
@@ -16,16 +16,20 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $user = $this->user();
+
+        if ($user->hasRole('super_admin')) {
+            return [
+                'full_name' => ['required', 'string', 'max:255'],
+                'email' => ['nullable', 'string', 'lowercase', 'email', 'max:255', Rule::unique(User::class)->ignore($user->id)],
+            ];
+        }
+
         return [
-            'full_name' => ['required', 'string', 'max:255'],
-            'email' => [
-                'nullable',
-                'string',
-                'lowercase',
-                'email',
-                'max:255',
-                Rule::unique(User::class)->ignore($this->user()->id),
-            ],
+            ...MemberRules::personal($user),
+            ...MemberRules::church(),
+            ...MemberRules::emergencyAndExtra(),
+            'photo' => ['nullable', ...MemberRules::photo()],
         ];
     }
 }

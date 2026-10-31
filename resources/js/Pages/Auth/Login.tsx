@@ -15,7 +15,7 @@ export default function Login({
     canResetPassword: boolean;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
-        email: '',
+        login: '',
         password: '',
         remember: false as boolean,
     });
@@ -32,6 +32,9 @@ export default function Login({
         <GuestLayout>
             <Head title="Log in" />
 
+            <h1 className="text-3xl">Welcome back</h1>
+            <div className="gold-rule mb-6" />
+
             {status && (
                 <div className="mb-4 text-sm font-medium text-success">
                     {status}
@@ -40,20 +43,20 @@ export default function Login({
 
             <form onSubmit={submit}>
                 <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="login" value="Phone or email" />
 
                     <TextInput
-                        id="email"
-                        type="email"
-                        name="email"
-                        value={data.email}
+                        id="login"
+                        type="text"
+                        name="login"
+                        value={data.login}
                         className="mt-1 block w-full"
                         autoComplete="username"
                         isFocused={true}
-                        onChange={(e) => setData('email', e.target.value)}
+                        onChange={(e) => setData('login', e.target.value)}
                     />
 
-                    <InputError message={errors.email} className="mt-2" />
+                    <InputError message={errors.login} className="mt-2" />
                 </div>
 
                 <div className="mt-4">
@@ -90,13 +93,13 @@ export default function Login({
                     </label>
                 </div>
 
-                <div className="mt-4 flex items-center justify-end">
+                <div className="mt-6 flex items-center justify-end">
                     {canResetPassword && (
                         <Link
                             href={route('password.request')}
                             className="rounded-lg text-sm text-neutral-600 underline hover:text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-700 focus:ring-offset-2"
                         >
-                            Forgot your password?
+                            Forgot password?
                         </Link>
                     )}
 
@@ -104,6 +107,16 @@ export default function Login({
                         Log in
                     </PrimaryButton>
                 </div>
+
+                <p className="mt-6 text-center text-sm text-neutral-600">
+                    New to the workforce?{' '}
+                    <Link
+                        href={route('register')}
+                        className="font-medium text-primary-700 underline"
+                    >
+                        Register
+                    </Link>
+                </p>
             </form>
         </GuestLayout>
     );

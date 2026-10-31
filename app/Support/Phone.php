@@ -9,16 +9,21 @@ class Phone
      */
     public static function normalize(string $phone): string
     {
-        $digits = preg_replace('/\D/', '', $phone);
+        $digits = self::digits($phone);
 
         if ($digits === '') {
             return '';
         }
 
         if (str_starts_with($phone, '+') || str_starts_with($digits, '234')) {
-            return '+'.$digits;
+            return '+'.preg_replace('/^2340/', '234', $digits);
         }
 
         return '+234'.ltrim($digits, '0');
+    }
+
+    public static function digits(string $phone): string
+    {
+        return preg_replace('/\D/', '', $phone);
     }
 }

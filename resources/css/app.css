@@ -32,6 +32,19 @@
     }
 }
 
+@keyframes scan-line {
+    from {
+        top: 8%;
+    }
+    to {
+        top: 92%;
+    }
+}
+
+.scan-line {
+    animation: scan-line 2s ease-in-out infinite alternate;
+}
+
 @media (prefers-reduced-motion: reduce) {
     *,
     ::before,
@@ -39,5 +52,27 @@
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
         scroll-behavior: auto !important;
+    }
+}
+
+/* ID cards print at the standard bank card size. */
+@media print {
+    @page {
+        size: 85.6mm 53.98mm;
+        margin: 0;
+    }
+
+    html,
+    body {
+        background: white;
+    }
+
+    .id-card {
+        width: 85.6mm !important;
+        height: 53.98mm !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
     }
 }

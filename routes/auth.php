@@ -15,7 +15,15 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    Route::post('register/check', [RegisteredUserController::class, 'check'])
+        ->middleware('throttle:60,1')
+        ->name('register.check');
+
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:10,1');
+
+    Route::get('register/pending', [RegisteredUserController::class, 'pending'])
+        ->name('register.pending');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
