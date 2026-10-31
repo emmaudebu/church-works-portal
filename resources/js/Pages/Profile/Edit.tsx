@@ -1,3 +1,4 @@
+import InstallApp from '@/Components/InstallApp';
 import AccountLayout from '@/Layouts/AccountLayout';
 import { PageProps } from '@/types';
 import { Head, Link } from '@inertiajs/react';
@@ -44,6 +45,8 @@ export default function Edit({
                 <div className="card p-4 sm:p-8">
                     <UpdatePasswordForm />
                 </div>
+
+                <InstallApp />
 
                 <Link
                     href={route('logout')}

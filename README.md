@@ -39,6 +39,10 @@ Sunday and Wednesday services are created automatically for active departments. 
 
 The QR scanner needs camera access, which browsers only allow on `https` or `localhost`.
 
+## Installable app
+
+`npm run build` creates the service worker in `public/` and the manifest in `public/build/`. The service worker only stores the app's code, icons and the offline page, never member data. Serve `sw.js` with `Cache-Control: no-cache` so updates reach phones. Installing and offline support need `https`.
+
 ## Elections
 
 Votes are stored with a hash of the voter and position, keyed with `APP_KEY`. Do not change `APP_KEY` while an election is open: the app would no longer recognise who has voted.
