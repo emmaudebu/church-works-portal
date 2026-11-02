@@ -15,7 +15,7 @@ export default function PublicLayout({
     topBar,
 }: PropsWithChildren<{ topBar?: ReactNode }>) {
     const { props, url } = usePage<PageProps>();
-    const { auth, branding, popup, verseToast } = props;
+    const { auth, branding, popup, singleDepartment, verseToast } = props;
     const { user } = auth;
     const [open, setOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
@@ -33,7 +33,12 @@ export default function PublicLayout({
 
     const links = [
         { label: 'Home', href: route('home') },
-        { label: 'Departments', href: route('departments') },
+        singleDepartment
+            ? {
+                  label: 'Our Department',
+                  href: route('departments.show', singleDepartment.slug),
+              }
+            : { label: 'Departments', href: route('departments') },
         { label: 'News', href: route('news', { type: 'news' }) },
         { label: 'Events', href: route('news', { type: 'event' }) },
         { label: 'Announcements', href: route('news', { type: 'announcement' }) },

@@ -56,7 +56,7 @@ class AttendanceStats
             ->when($from, fn ($query) => $query->whereDate('date', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date', '<=', $to))
             ->orderBy('date')
-            ->get(['id', 'department_id', 'title', 'type', 'date']);
+            ->get(['id', 'department_id', 'title', 'type', 'date', 'opens_at']);
     }
 
     /**

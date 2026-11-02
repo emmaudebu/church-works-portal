@@ -19,7 +19,7 @@ beforeEach(function () {
 
     Storage::fake('public');
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
     $this->superAdmin = User::factory()->create()->assignRole('super_admin');
     $this->admin = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
     $this->member = User::factory()->create(['department_id' => $this->technical->id])->assignRole('member');
@@ -36,7 +36,7 @@ test('only super admins can use settings', function (string $user) {
     $this->actingAs($actor)->post(route('admin.settings.super-admins.store'), ['user_id' => $actor->id, 'password' => 'password'])->assertForbidden();
 
     expect($actor->fresh()->hasRole('super_admin'))->toBeFalse()
-        ->and(Settings::churchName())->toBe('Covenant Workforce');
+        ->and(Settings::churchName())->toBe('Covenant Technical Department');
 })->with(['admin', 'member']);
 
 test('the church name reaches every page', function () {
@@ -166,7 +166,25 @@ test('generating twice does not duplicate services', function () {
     expect(Service::count())->toBe($count);
 });
 
+test('the first visit of the day creates the coming services without the scheduler', function () {
+    $this->travelTo('2026-11-02 10:00:00');
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('nextService.title', 'Wednesday Service')
+        ->where('nextService.date_label', 'Wednesday, 4 November'));
+
+    expect(Service::whereDate('date', '2026-11-08')->value('title'))->toBe('Sunday Service');
+
+    $this->travelTo('2026-11-20 10:00:00');
+
+    $this->get('/');
+
+    expect(Service::whereDate('date', '2026-11-29')->exists())->toBeTrue();
+});
+
 test('new times apply to upcoming services but not to ones already used', function () {
+    $this->travelTo('2026-11-03 10:00:00');
+
     ServiceGenerator::generate();
 
     $sundays = Service::where('recurring_key', 'sunday')->orderBy('date')->get();
@@ -234,6 +252,17 @@ function homeSettings(array $overrides = []): array
             'button_label' => 'Go',
             'button_link' => '/news',
         ],
+        'join' => [
+            'eyebrow' => 'Come along',
+            'title' => 'New join heading',
+            'accent' => 'Today',
+            'text' => 'Join sentence',
+            'steps' => [
+                ['title' => 'First step', 'text' => 'First sentence'],
+                ['title' => 'Second step', 'text' => 'Second sentence'],
+                ['title' => 'Third step', 'text' => 'Third sentence'],
+            ],
+        ],
         ...$overrides,
     ];
 }
@@ -278,6 +307,65 @@ test('hero and welcome images can be uploaded and old uploads are removed', func
 
     Storage::disk('public')->assertMissing($home['slides'][0]['image']);
     Storage::disk('public')->assertExists($home['welcome']['image']);
+});
+
+test('the join the team section can be changed and keeps its pictures', function () {
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), homeSettings())
+        ->assertSessionHasNoErrors();
+
+    $this->post('/logout');
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('home.join.eyebrow', 'Come along')
+        ->where('home.join.title', 'New join heading')
+        ->where('home.join.steps.1.title', 'Second step')
+        ->where('home.join.steps.1.text', 'Second sentence')
+        ->where('home.join.steps.1.image', '/images/site/auditorium.jpg'));
+});
+
+test('a join step picture can be replaced and the old upload is removed', function () {
+    $data = homeSettings();
+    $data['join']['steps'][0]['image'] = UploadedFile::fake()->image('first.jpg', 800, 600);
+    $data['join']['steps'][2]['image'] = UploadedFile::fake()->image('third.jpg', 800, 600);
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data)->assertSessionHasNoErrors();
+
+    $steps = Settings::home()['join']['steps'];
+
+    Storage::disk('public')->assertExists([$steps[0]['image'], $steps[2]['image']]);
+
+    $data = homeSettings();
+    $data['join']['steps'][0]['image'] = UploadedFile::fake()->image('newer.jpg', 800, 600);
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data)->assertSessionHasNoErrors();
+
+    Storage::disk('public')->assertMissing($steps[0]['image']);
+    Storage::disk('public')->assertExists($steps[2]['image']);
+});
+
+test('a homepage saved before the join section existed still shows it', function () {
+    $saved = Settings::DEFAULT_HOME;
+    unset($saved['join']);
+
+    Settings::set('home', $saved);
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('home.join.title', 'Your Place')
+        ->has('home.join.steps', 3));
+});
+
+test('every join step needs a title and there must be three', function () {
+    $data = homeSettings();
+    $data['join']['steps'][1]['title'] = '';
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data)
+        ->assertSessionHasErrors('join.steps.1.title');
+
+    $data = homeSettings();
+    array_pop($data['join']['steps']);
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data)
+        ->assertSessionHasErrors('join.steps');
 });
 
 test('slides can be added and a new slide needs a picture', function () {

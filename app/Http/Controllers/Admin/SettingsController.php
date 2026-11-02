@@ -158,7 +158,7 @@ class SettingsController extends Controller
         Service::whereNotNull('recurring_key')
             ->where('opens_at', '>', now())
             ->whereDoesntHave('attendance')
-            ->delete();
+            ->forceDelete();
 
         ServiceGenerator::generate();
 
@@ -166,8 +166,8 @@ class SettingsController extends Controller
     }
 
     /**
-     * Save the homepage slider and welcome section. Uploaded pictures replace
-     * the old ones, which are removed once nothing uses them.
+     * Save the homepage slider, welcome and join the team sections. Uploaded
+     * pictures replace the old ones, which are removed once nothing uses them.
      */
     public function updateHome(Request $request): RedirectResponse
     {
@@ -189,6 +189,14 @@ class SettingsController extends Controller
             'welcome.button_link' => ['required', 'string', 'max:500', $this->safeLink()],
             'welcome.image' => $picture,
             'welcome.small_image' => $picture,
+            'join.eyebrow' => ['nullable', 'string', 'max:50'],
+            'join.title' => ['required', 'string', 'max:100'],
+            'join.accent' => ['nullable', 'string', 'max:60'],
+            'join.text' => ['required', 'string', 'max:300'],
+            'join.steps' => ['required', 'array', 'size:3'],
+            'join.steps.*.title' => ['required', 'string', 'max:80'],
+            'join.steps.*.text' => ['required', 'string', 'max:300'],
+            'join.steps.*.image' => $picture,
         ]);
 
         $current = Settings::home();
@@ -218,9 +226,22 @@ class SettingsController extends Controller
             'small_image' => $request->hasFile('welcome.small_image') ? PostImage::store($request->file('welcome.small_image')) : $current['welcome']['small_image'],
         ];
 
-        Settings::set('home', ['slides' => $slides, 'welcome' => $welcome]);
+        $join = [
+            ...collect($validated['join'])->except('steps')->map(fn ($value) => $value ?? '')->all(),
+            'steps' => collect($validated['join']['steps'])->map(fn (array $step, int $index) => [
+                'title' => $step['title'],
+                'text' => $step['text'],
+                'image' => $request->hasFile("join.steps.{$index}.image")
+                    ? PostImage::store($request->file("join.steps.{$index}.image"))
+                    : $current['join']['steps'][$index]['image'],
+            ])->values()->all(),
+        ];
 
-        $this->deleteUnusedHomeImages($current, ['slides' => $slides, 'welcome' => $welcome]);
+        $home = ['slides' => $slides, 'welcome' => $welcome, 'join' => $join];
+
+        Settings::set('home', $home);
+
+        $this->deleteUnusedHomeImages($current, $home);
 
         return back()->with('success', 'Homepage saved.');
     }
@@ -414,7 +435,8 @@ class SettingsController extends Controller
     private function deleteUnusedHomeImages(array $old, array $new): void
     {
         $paths = fn (array $home) => collect($home['slides'])->pluck('image')
-            ->push($home['welcome']['image'], $home['welcome']['small_image']);
+            ->push($home['welcome']['image'], $home['welcome']['small_image'])
+            ->merge(collect($home['join']['steps'])->pluck('image'));
 
         $paths($old)->diff($paths($new))
             ->reject(fn (string $path) => str_starts_with($path, '/'))

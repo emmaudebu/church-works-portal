@@ -2,6 +2,9 @@
 
 use App\Models\Department;
 use App\Models\DepartmentImage;
+use App\Models\Due;
+use App\Models\Payment;
+use App\Models\Service;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\CurrentDepartment;
@@ -15,13 +18,13 @@ beforeEach(function () {
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
     $this->superAdmin = User::factory()->create()->assignRole('super_admin');
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
 });
 
-test('the seeder launches the technical unit with choir and ushering coming soon', function () {
+test('the seeder launches the technical department with choir and ushering coming soon', function () {
     expect(Department::pluck('status', 'slug')->all())->toEqual([
         'choir' => 'coming_soon',
-        'technical-unit' => 'active',
+        'technical-department' => 'active',
         'ushering' => 'coming_soon',
     ]);
 });
@@ -41,21 +44,74 @@ test('the landing page lists active departments first with active member counts'
     $this->get('/')->assertInertia(fn (Assert $page) => $page
         ->component('Welcome')
         ->has('departments', 3)
-        ->where('departments.0.slug', 'technical-unit')
+        ->where('departments.0.slug', 'technical-department')
         ->where('departments.0.members_count', 2)
         ->where('departments.1.status', 'coming_soon'));
 });
 
-test('every department has its own public page', function () {
-    $this->get(route('departments'))->assertOk()
-        ->assertInertia(fn (Assert $page) => $page->component('Site/Departments')->has('departments', 3));
+test('with one active department the site goes straight to it', function () {
+    $this->get(route('departments'))->assertRedirect(route('departments.show', 'technical-department'));
 
-    $this->get(route('departments.show', 'technical-unit'))->assertOk()
+    $this->get(route('departments.show', 'technical-department'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('singleDepartment.slug', 'technical-department')
+            ->has('others', 0));
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('units', ['Lighting', 'Media', 'Projection', 'Sound'])
+        ->where('stats.units', 4));
+});
+
+test('a second active department brings the department list back', function () {
+    Department::factory()->create();
+
+    $this->get(route('departments'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Site/Departments')
+            ->where('singleDepartment', null)
+            ->has('departments', 4));
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page->where('units', []));
+    $this->actingAs($this->superAdmin)->get(route('admin.dashboard'))
+        ->assertInertia(fn (Assert $page) => $page->has('departmentContext.options', 4));
+});
+
+test('with one active department a super admin works in it without choosing', function () {
+    $this->actingAs($this->superAdmin)->get(route('admin.dashboard'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('departmentContext.options', null)
+            ->where('departmentContext.current_name', 'Technical Department'));
+
+    $this->post(route('admin.services.store'), [
+        'title' => 'Vigil', 'date' => now()->addDay()->toDateString(), 'opens_at' => '21:00', 'closes_at' => '23:30',
+    ])->assertSessionHasNoErrors();
+
+    expect(Service::firstWhere('title', 'Vigil')->department_id)->toBe($this->technical->id);
+});
+
+test('a super admin left in a closed department can still switch away', function () {
+    $this->actingAs($this->superAdmin)
+        ->withSession([CurrentDepartment::SESSION_KEY => Department::firstWhere('slug', 'choir')->id])
+        ->get(route('admin.dashboard'))
+        ->assertInertia(fn (Assert $page) => $page->has('departmentContext.options', 3));
+});
+
+test('the old technical unit address still works', function () {
+    $this->get('/departments/technical-unit')->assertRedirect('/departments/technical-department');
+});
+
+test('every department has its own public page', function () {
+    Department::factory()->create(['name' => 'Protocol', 'slug' => 'protocol']);
+
+    $this->get(route('departments'))->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('Site/Departments')->has('departments', 4));
+
+    $this->get(route('departments.show', 'technical-department'))->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Site/Department')
-            ->where('department.name', 'Technical Unit')
+            ->where('department.name', 'Technical Department')
             ->where('units', ['Lighting', 'Media', 'Projection', 'Sound'])
-            ->has('others', 2));
+            ->has('others', 3));
 
     $this->get(route('departments.show', 'choir'))->assertOk();
     $this->get('/departments/nothing-here')->assertNotFound();
@@ -64,7 +120,7 @@ test('every department has its own public page', function () {
 test('a department page does not count suspended members', function () {
     User::factory()->suspended()->create(['department_id' => $this->technical->id]);
 
-    $this->get(route('departments.show', 'technical-unit'))
+    $this->get(route('departments.show', 'technical-department'))
         ->assertInertia(fn (Assert $page) => $page->where('department.members_count', 0));
 });
 
@@ -76,7 +132,7 @@ test('the department page shows officers first and active members in the team', 
     User::factory()->pending()->create(['department_id' => $this->technical->id])->assignRole('member');
     User::factory()->suspended()->create(['department_id' => $this->technical->id])->assignRole('member');
 
-    $this->get(route('departments.show', 'technical-unit'))->assertInertia(fn (Assert $page) => $page
+    $this->get(route('departments.show', 'technical-department'))->assertInertia(fn (Assert $page) => $page
         ->has('officers', 2)
         ->where('officers.0.id', $head->id)
         ->where('officers.0.office', 'Head of Department')
@@ -108,7 +164,7 @@ test('public photos only exist for active members who allow it', function () {
 test('an officer who hides themselves keeps their name but not their photo', function () {
     $head = User::factory()->create(['department_id' => $this->technical->id, 'photo' => 'photos/a.jpg', 'show_on_site' => false])->assignRole('dept_admin');
 
-    $this->get(route('departments.show', 'technical-unit'))->assertInertia(fn (Assert $page) => $page
+    $this->get(route('departments.show', 'technical-department'))->assertInertia(fn (Assert $page) => $page
         ->where('officers.0.full_name', $head->full_name)
         ->where('officers.0.photo_url', null));
 });
@@ -125,11 +181,69 @@ test('a member can hide themselves from their profile', function () {
     expect($member->fresh()->show_on_site)->toBeFalse();
 });
 
+test('a member can share social links on their public card', function () {
+    $member = User::factory()->create(['department_id' => $this->technical->id])->assignRole('member');
+
+    $this->actingAs($member)->patch('/profile', [
+        'full_name' => 'A', 'gender' => 'male', 'date_of_birth' => '1990-01-01', 'phone' => $member->phone, 'email' => $member->email,
+        'address' => 'B', 'unit' => 'Sound', 'next_of_kin_name' => 'C', 'next_of_kin_relationship' => 'D', 'next_of_kin_phone' => '08011112222',
+        'socials' => [
+            'whatsapp' => '0801 234 5678',
+            'facebook' => 'facebook.com/grace.ade',
+            'instagram' => '@grace_ade',
+            'x' => '',
+            'tiktok' => 'graceade',
+        ],
+    ])->assertSessionHasNoErrors();
+
+    expect($member->fresh()->socials)->toEqual([
+        'whatsapp' => '+2348012345678',
+        'facebook' => 'https://facebook.com/grace.ade',
+        'instagram' => 'https://instagram.com/grace_ade',
+        'tiktok' => 'https://tiktok.com/@graceade',
+    ]);
+
+    $this->get(route('departments.show', 'technical-department'))->assertInertia(fn (Assert $page) => $page
+        ->has('team.0.socials', 4)
+        ->where('team.0.socials.0', ['network' => 'whatsapp', 'url' => 'https://wa.me/2348012345678'])
+        ->where('team.0.socials.2', ['network' => 'instagram', 'url' => 'https://instagram.com/grace_ade'])
+        ->missing('team.0.phone'));
+});
+
+test('a social link can only point at its own site', function (string $network, string $value) {
+    $member = User::factory()->create(['department_id' => $this->technical->id])->assignRole('member');
+
+    $this->actingAs($member)->patch('/profile', [
+        'full_name' => 'A', 'gender' => 'male', 'date_of_birth' => '1990-01-01', 'phone' => $member->phone, 'email' => $member->email,
+        'address' => 'B', 'unit' => 'Sound', 'next_of_kin_name' => 'C', 'next_of_kin_relationship' => 'D', 'next_of_kin_phone' => '08011112222',
+        'socials' => [$network => $value],
+    ])->assertSessionHasErrors("socials.$network");
+
+    expect($member->fresh()->socials)->toBeNull();
+})->with([
+    ['facebook', 'https://evil.example/page'],
+    ['facebook', 'https://facebook.com.evil.example/page'],
+    ['instagram', 'javascript:alert(1)'],
+    ['x', 'https://x.com'],
+    ['whatsapp', '123'],
+    ['whatsapp', 'call me'],
+]);
+
+test('hiding yourself also hides your social links', function () {
+    $member = User::factory()->create(['socials' => ['whatsapp' => '+2348012345678']]);
+
+    expect($member->fresh()->publicSocials())->toHaveCount(1);
+
+    $member->update(['show_on_site' => false]);
+
+    expect($member->fresh()->publicSocials())->toBe([]);
+});
+
 test('a super admin can write a department page and upload its picture', function () {
     Storage::fake('public');
 
     $this->actingAs($this->superAdmin)->post(route('admin.departments.page', $this->technical), [
-        'name' => 'Technical Unit',
+        'name' => 'Technical Department',
         'icon' => 'mic',
         'description' => 'New line',
         'about' => 'Our story',
@@ -141,7 +255,7 @@ test('a super admin can write a department page and upload its picture', functio
     expect($department->about)->toBe('Our story');
     Storage::disk('public')->assertExists($department->image);
 
-    $this->actingAs($this->superAdmin)->post(route('admin.departments.page', $this->technical), ['name' => 'Technical Unit', 'icon' => 'mic', 'about' => 'Edited', 'image' => null]);
+    $this->actingAs($this->superAdmin)->post(route('admin.departments.page', $this->technical), ['name' => 'Technical Department', 'icon' => 'mic', 'about' => 'Edited', 'image' => null]);
 
     expect($this->technical->fresh()->image)->toBe($department->image);
 });
@@ -160,11 +274,72 @@ test('a head of department edits their own page but not its name or icon', funct
 
     expect($department->about)->toBe('Our new story')
         ->and($department->description)->toBe('Fresh line')
-        ->and($department->name)->toBe('Technical Unit')
+        ->and($department->name)->toBe('Technical Department')
         ->and($department->icon)->toBe('monitor-speaker')
         ->and($department->image)->not->toBe($image);
 
     Storage::disk('public')->assertExists($department->image);
+});
+
+test('the about section can be changed and shows on the public page', function () {
+    Storage::fake('public');
+
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+
+    $this->actingAs($head)->post(route('admin.departments.page', $this->technical), [
+        'about_label' => 'Who we are',
+        'about_title' => 'Serving behind',
+        'about_accent' => 'the scenes',
+        'about_image' => UploadedFile::fake()->image('arch.jpg', 800, 1000),
+        'about_small_image' => UploadedFile::fake()->image('round.jpg', 400, 400),
+    ])->assertSessionHasNoErrors();
+
+    $department = $this->technical->fresh();
+
+    Storage::disk('public')->assertExists([$department->about_image, $department->about_small_image]);
+
+    $this->get(route('departments.show', $department))->assertInertia(fn (Assert $page) => $page
+        ->where('department.about_label', 'Who we are')
+        ->where('department.about_title', 'Serving behind')
+        ->where('department.about_accent', 'the scenes')
+        ->where('department.about_image_url', Storage::disk('public')->url($department->about_image))
+        ->where('department.about_small_image_url', Storage::disk('public')->url($department->about_small_image)));
+});
+
+test('a new about picture replaces only its own upload', function () {
+    Storage::fake('public');
+
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+    $this->technical->update([
+        'about_image' => UploadedFile::fake()->image('old.jpg')->store('posts', 'public'),
+        'about_small_image' => UploadedFile::fake()->image('small.jpg')->store('posts', 'public'),
+    ]);
+
+    $this->actingAs($head)->post(route('admin.departments.page', $this->technical), [
+        'about_image' => UploadedFile::fake()->image('new.jpg'),
+    ])->assertSessionHasNoErrors();
+
+    Storage::disk('public')->assertMissing($this->technical->about_image);
+    Storage::disk('public')->assertExists([$this->technical->fresh()->about_image, $this->technical->about_small_image]);
+});
+
+test('deleting a department removes its about pictures', function () {
+    Storage::fake('public');
+
+    $choir = Department::firstWhere('slug', 'choir');
+    $choir->update(['about_image' => UploadedFile::fake()->image('arch.jpg')->store('posts', 'public')]);
+
+    $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $choir))->assertSessionHasNoErrors();
+
+    Storage::disk('public')->assertMissing($choir->about_image);
+});
+
+test('only pictures are accepted for the about section', function () {
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+
+    $this->actingAs($head)->post(route('admin.departments.page', $this->technical), [
+        'about_image' => UploadedFile::fake()->create('notes.pdf', 10, 'application/pdf'),
+    ])->assertSessionHasErrors('about_image');
 });
 
 test('saving a page without a new picture keeps the banner', function () {
@@ -230,15 +405,51 @@ test('department admins can not create or delete departments', function () {
     $this->actingAs($admin)->delete(route('admin.departments.destroy', $this->technical))->assertForbidden();
 });
 
-test('an empty department can be deleted but not one with members', function () {
+test('an empty department can be deleted straight away', function () {
     $choir = Department::firstWhere('slug', 'choir');
-    User::factory()->create(['department_id' => $this->technical->id]);
 
     $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $choir))->assertRedirect();
-    $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $this->technical))->assertSessionHasErrors('department');
 
-    expect(Department::find($choir->id))->toBeNull()
-        ->and(Department::find($this->technical->id))->not->toBeNull();
+    expect(Department::find($choir->id))->toBeNull();
+});
+
+test('a department in use needs its name typed to be deleted', function () {
+    User::factory()->create(['department_id' => $this->technical->id]);
+
+    $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $this->technical))
+        ->assertSessionHasErrors('confirm_name');
+
+    $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $this->technical), ['confirm_name' => 'technical'])
+        ->assertSessionHasErrors('confirm_name');
+
+    expect(Department::find($this->technical->id))->not->toBeNull();
+});
+
+test('deleting a department keeps people and payments but not its offices', function () {
+    $member = User::factory()->create(['department_id' => $this->technical->id])->assignRole('member');
+    $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
+    $due = Due::create(['department_id' => $this->technical->id, 'title' => 'Dues', 'type' => 'monthly', 'amount' => 100000, 'starts_on' => '2026-01-01']);
+
+    $payment = fn (string $reference, string $status) => Payment::create([
+        'user_id' => $member->id, 'due_id' => $due->id, 'purpose' => 'Dues', 'period' => '2026-10',
+        'amount' => 100000, 'reference' => $reference, 'batch' => $reference, 'status' => $status, 'method' => 'transfer',
+    ]);
+
+    $paid = $payment('TRF-A', 'success');
+    $waiting = $payment('TRF-B', 'under_review');
+
+    $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $this->technical), ['confirm_name' => $this->technical->name])
+        ->assertRedirect(route('admin.departments'));
+
+    expect(Department::find($this->technical->id))->toBeNull()
+        ->and($member->fresh()->department_id)->toBeNull()
+        ->and($head->fresh()->getRoleNames()->all())->toBe(['member'])
+        ->and($paid->fresh()->status)->toBe('success')
+        ->and($paid->fresh()->purpose)->toBe('Dues')
+        ->and($waiting->fresh()->status)->toBe('rejected');
+
+    $this->actingAs($member->fresh())->get('/payments')->assertInertia(fn (Assert $page) => $page->has('history', 1));
+    $this->actingAs($member->fresh())->get('/home')->assertOk();
 });
 
 test('a department admin manages units in their own department only', function () {
@@ -312,13 +523,29 @@ test('the gallery shows on the public page and pictures can be captioned and rem
 
     $this->post('/logout');
 
-    $this->get(route('departments.show', 'technical-unit'))
+    $this->get(route('departments.show', 'technical-department'))
         ->assertInertia(fn (Assert $page) => $page->has('gallery', 2));
 
     $this->actingAs($this->superAdmin)->delete(route('admin.gallery.destroy', $image))->assertRedirect();
 
     Storage::disk('public')->assertMissing($image->image);
     expect(DepartmentImage::find($image->id))->toBeNull();
+});
+
+test('the public banner uses a gallery picture until the department sets its own', function () {
+    $banner = fn (string $expected) => $this->get(route('departments.show', $this->technical))
+        ->assertInertia(fn (Assert $page) => $page->where('department.image_url', fn (string $url) => str_ends_with($url, $expected)));
+
+    $banner($this->technical->imageUrl());
+
+    $this->technical->images()->create(['image' => 'gallery/oldest.jpg']);
+    $this->technical->images()->create(['image' => 'gallery/newest.jpg']);
+
+    $banner('gallery/oldest.jpg');
+
+    $this->technical->update(['image' => 'posts/banner.jpg']);
+
+    $banner('posts/banner.jpg');
 });
 
 test('only pictures can go in the gallery and another department is off limits', function () {
@@ -357,7 +584,7 @@ test('department admins and members can not manage departments', function (strin
         ->assertForbidden();
 
     $this->actingAs($user)
-        ->post(route('admin.departments.admins.store', $this->technical), ['user_id' => $user->id])
+        ->post(route('admin.departments.admins.store', Department::firstWhere('slug', 'choir')), ['user_id' => $user->id, 'office' => 'secretary'])
         ->assertForbidden();
 
     expect($this->technical->fresh()->status)->toBe('active');

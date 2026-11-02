@@ -15,7 +15,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 beforeEach(function () {
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
     $this->choir = Department::firstWhere('slug', 'choir');
 
     $this->admin = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
@@ -256,6 +256,34 @@ test('a special service can be created with a valid window', function () {
     $this->actingAs($this->admin)->post(route('admin.services.store'), [
         'title' => 'Bad', 'date' => '2026-11-06', 'opens_at' => '23:00', 'closes_at' => '21:00',
     ])->assertSessionHasErrors('closes_at');
+});
+
+test('a super admin can delete any service with its attendance', function () {
+    Attendance::create(['service_id' => $this->service->id, 'user_id' => $this->member->id, 'method' => 'qr', 'checked_in_at' => now()]);
+
+    $superAdmin = User::factory()->create()->assignRole('super_admin');
+
+    $this->actingAs($superAdmin)->delete(route('admin.services.destroy', $this->service))->assertRedirect();
+
+    expect(Service::find($this->service->id))->toBeNull()
+        ->and(Attendance::count())->toBe(0);
+});
+
+test('a deleted recurring service is not generated again', function () {
+    ServiceGenerator::generate();
+
+    $service = Service::whereNotNull('recurring_key')->orderBy('date')->firstOrFail();
+    $department = $service->department_id;
+    $count = Service::where('department_id', $department)->count();
+
+    $superAdmin = User::factory()->create()->assignRole('super_admin');
+
+    $this->actingAs($superAdmin)->delete(route('admin.services.destroy', $service))->assertRedirect();
+
+    ServiceGenerator::generate();
+
+    expect(Service::where('department_id', $department)->count())->toBe($count - 1)
+        ->and(Service::where(['department_id' => $department, 'recurring_key' => $service->recurring_key])->whereDate('date', $service->date)->exists())->toBeFalse();
 });
 
 test('only an unused special service can be deleted', function () {

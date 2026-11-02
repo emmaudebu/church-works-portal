@@ -79,6 +79,18 @@ export default {
                     from: { opacity: 0, transform: 'translateY(14px)', filter: 'blur(6px)' },
                     to: { opacity: 1, transform: 'none', filter: 'blur(0)' },
                 },
+                'border-spin': {
+                    from: { transform: 'translate(-50%, -50%) rotate(0deg)' },
+                    to: { transform: 'translate(-50%, -50%) rotate(360deg)' },
+                },
+                shine: {
+                    '0%': { left: '-50%' },
+                    '35%, 100%': { left: '130%' },
+                },
+                twinkle: {
+                    '0%, 100%': { opacity: 0.25, transform: 'scale(0.75) rotate(0deg)' },
+                    '50%': { opacity: 1, transform: 'scale(1.15) rotate(20deg)' },
+                },
                 shimmer: {
                     from: { backgroundPosition: '200% center' },
                     to: { backgroundPosition: '-200% center' },
@@ -142,6 +154,9 @@ export default {
                 'page-in': 'page-in 0.45s ease-out both',
                 'popup-fade': 'page-in 0.6s ease-out both',
                 'word-in': 'word-in 0.6s cubic-bezier(0.22, 1, 0.36, 1) both',
+                'border-spin': 'border-spin 5s linear infinite',
+                shine: 'shine 5s ease-in-out infinite',
+                twinkle: 'twinkle 2.8s ease-in-out infinite',
                 shimmer: 'shimmer 6s linear infinite',
                 glow: 'glow 4s ease-in-out infinite',
                 'toast-left': 'toast-left 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',

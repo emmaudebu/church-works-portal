@@ -109,7 +109,7 @@ export default function Login({
                 </div>
 
                 <p className="mt-6 text-center text-sm text-neutral-600">
-                    New to the workforce?{' '}
+                    New to the team?{' '}
                     <Link
                         href={route('register')}
                         className="font-medium text-primary-700 underline"

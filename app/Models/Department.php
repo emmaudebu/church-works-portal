@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
-#[Fillable(['name', 'slug', 'icon', 'description', 'image', 'about', 'bank_name', 'account_number', 'account_name', 'status'])]
+#[Fillable(['name', 'slug', 'icon', 'description', 'image', 'about', 'about_label', 'about_title', 'about_accent', 'about_image', 'about_small_image', 'bank_name', 'account_number', 'account_name', 'status'])]
 class Department extends Model
 {
     /** @use HasFactory<DepartmentFactory> */
@@ -26,11 +26,35 @@ class Department extends Model
      */
     private const FALLBACK_IMAGES = ['gathering', 'stage', 'praise', 'auditorium', 'worship'];
 
+    /**
+     * The only active department, or null once there are several.
+     */
+    public static function single(): ?self
+    {
+        $active = self::where('status', 'active')->limit(2)->get();
+
+        return $active->count() === 1 ? $active->first() : null;
+    }
+
     public function imageUrl(): string
     {
         return $this->image
             ? Storage::disk('public')->url($this->image)
             : '/images/site/'.self::FALLBACK_IMAGES[$this->id % count(self::FALLBACK_IMAGES)].'.jpg';
+    }
+
+    /**
+     * The picture across the top of the public page. Without one of its own a
+     * department uses its oldest gallery picture, which the About section does
+     * not already show.
+     */
+    public function bannerUrl(): string
+    {
+        $galleryImage = $this->images->last();
+
+        return ! $this->image && $galleryImage
+            ? $galleryImage->toCard()['url']
+            : $this->imageUrl();
     }
 
     /**
@@ -41,9 +65,11 @@ class Department extends Model
     public function toCard(): array
     {
         return [
-            ...$this->only(['id', 'name', 'slug', 'icon', 'description', 'about', 'status']),
+            ...$this->only(['id', 'name', 'slug', 'icon', 'description', 'about', 'about_label', 'about_title', 'about_accent', 'status']),
             'members_count' => (int) ($this->members_count ?? 0),
             'image_url' => $this->imageUrl(),
+            'about_image_url' => $this->about_image ? Storage::disk('public')->url($this->about_image) : null,
+            'about_small_image_url' => $this->about_small_image ? Storage::disk('public')->url($this->about_small_image) : null,
         ];
     }
 
@@ -58,6 +84,15 @@ class Department extends Model
     public function bankAccount(): array
     {
         return $this->only(['bank_name', 'account_number', 'account_name']);
+    }
+
+    /**
+     * Whether deleting this department would affect people or their records.
+     */
+    public function inUse(): bool
+    {
+        return $this->users()->exists()
+            || Attendance::whereHas('service', fn (Builder $services) => $services->where('department_id', $this->id))->exists();
     }
 
     /**

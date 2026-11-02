@@ -25,7 +25,12 @@ export interface Department {
     status: 'active' | 'coming_soon';
     members_count: number;
     about: string | null;
+    about_label: string | null;
+    about_title: string | null;
+    about_accent: string | null;
     image_url: string;
+    about_image_url: string | null;
+    about_small_image_url: string | null;
 }
 
 export interface DepartmentContext {
@@ -55,6 +60,19 @@ export interface HomeContent {
         image: string;
         small_image: string;
     };
+    join: {
+        eyebrow: string;
+        title: string;
+        accent: string;
+        text: string;
+        steps: JoinStep[];
+    };
+}
+
+export interface JoinStep {
+    image: string;
+    title: string;
+    text: string;
 }
 
 export interface GalleryImage {
@@ -195,10 +213,12 @@ export interface Turnout {
 export type PageProps<
     T extends Record<string, unknown> = Record<string, unknown>,
 > = T & {
+    pendingReceipts: number;
     auth: {
         user: User;
     };
     departmentContext: DepartmentContext | null;
+    singleDepartment: { name: string; slug: string } | null;
     branding: Branding;
     popup: SitePopupData | null;
     verseToast: VerseToastData | null;

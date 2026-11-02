@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureOffice;
 use App\Http\Middleware\EnsurePasswordIsChanged;
+use App\Http\Middleware\EnsureUpcomingServices;
 use App\Http\Middleware\EnsureUserIsActive;
 use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Foundation\Application;
@@ -21,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            EnsureUpcomingServices::class,
             EnsureUserIsActive::class,
             EnsurePasswordIsChanged::class,
             HandleInertiaRequests::class,

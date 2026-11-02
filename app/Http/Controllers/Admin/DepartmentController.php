@@ -3,8 +3,11 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Attendance;
+use App\Models\Candidate;
 use App\Models\Department;
+use App\Models\Due;
+use App\Models\Payment;
+use App\Models\Post;
 use App\Models\User;
 use App\Support\CurrentDepartment;
 use App\Support\Offices;
@@ -12,6 +15,7 @@ use App\Support\PostImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -28,6 +32,7 @@ class DepartmentController extends Controller
     {
         return Inertia::render('Admin/Departments', [
             'departments' => Department::forDisplay()
+                ->withCount('users as people_count')
                 ->with(['users' => fn ($users) => $users->role(Offices::roles())->with('roles:id,name')->orderBy('full_name')])
                 ->get()
                 ->map(fn (Department $department) => [
@@ -36,7 +41,8 @@ class DepartmentController extends Controller
                         ...$user->only(['id', 'full_name']),
                         'office' => $user->office(),
                     ]),
-                    'deletable' => $department->members_count === 0 && $department->users->isEmpty(),
+                    'in_use' => $department->inUse(),
+                    'people_count' => $department->people_count,
                 ]),
             'icons' => Department::ICONS,
             'offices' => Offices::LABELS,
@@ -72,29 +78,59 @@ class DepartmentController extends Controller
     }
 
     /**
-     * Delete a department that has no members or attendance history.
+     * Delete a department and everything that belongs to it. One still in use
+     * must be confirmed by typing its name. Members keep their accounts and join
+     * no department, and payment records are kept as financial history.
      */
-    public function destroy(Department $department): RedirectResponse
+    public function destroy(Request $request, Department $department): RedirectResponse
     {
-        if ($department->users()->exists() || Attendance::whereHas('service', fn ($services) => $services->where('department_id', $department->id))->exists()) {
-            throw ValidationException::withMessages(['department' => 'Only a department with no members and no attendance can be deleted.']);
+        if ($department->inUse()) {
+            $request->validate(
+                ['confirm_name' => ['required', Rule::in([$department->name])]],
+                ['confirm_name.*' => 'Type the department name exactly to delete it.'],
+            );
         }
 
-        $paths = $department->images()->pluck('image')->push($department->image)->filter();
+        $publicFiles = $department->images()->pluck('image')
+            ->push($department->image, $department->about_image, $department->about_small_image)
+            ->merge(Post::where('department_id', $department->id)->pluck('image'))
+            ->filter();
 
-        Storage::disk('public')->delete($paths->all());
+        $candidatePhotos = Candidate::whereHas('position.election', fn ($elections) => $elections->where('department_id', $department->id))
+            ->pluck('photo')
+            ->filter();
 
-        $department->delete();
+        DB::transaction(function () use ($department) {
+            User::where('department_id', $department->id)
+                ->role(Offices::roles())
+                ->get()
+                ->each->syncRoles(['member']);
+
+            Payment::whereIn('due_id', Due::where('department_id', $department->id)->select('id'))
+                ->where('status', 'under_review')
+                ->update([
+                    'status' => 'rejected',
+                    'rejection_reason' => 'Your department was closed before this could be checked. Please speak to the church office.',
+                ]);
+
+            $department->delete();
+        });
+
+        Storage::disk('public')->delete($publicFiles->all());
+        Storage::disk('local')->delete($candidatePhotos->all());
 
         return to_route('admin.departments')->with('success', 'Department deleted.');
     }
 
     /**
-     * Save the account members transfer dues to. Limited to super admins because
-     * a changed account number would send everyone's money somewhere else.
+     * Save the account members transfer dues to. Limited to the Head and super
+     * admins, with their password, because a changed account number would send
+     * everyone's money somewhere else.
      */
     public function updateBank(Request $request, Department $department): RedirectResponse
     {
+        abort_unless($request->user()->leadsDepartment($department->id), 403);
+
         $department->update($request->validate([
             'bank_name' => ['nullable', 'required_with:account_number,account_name', 'string', 'max:100'],
             'account_number' => ['nullable', 'required_with:bank_name,account_name', 'digits_between:10,20'],
@@ -118,7 +154,7 @@ class DepartmentController extends Controller
     }
 
     /**
-     * Save the description, story and picture shown on the department's page.
+     * Save the description, About us section and pictures shown on the department's page.
      * Its name and icon appear across the site, so those stay with super admins.
      */
     public function updatePage(Request $request, Department $department): RedirectResponse
@@ -127,6 +163,8 @@ class DepartmentController extends Controller
 
         abort_unless($admin->canAccessDepartment($department->id), 404);
 
+        $picture = ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'];
+
         $validated = $request->validate([
             ...($admin->hasRole('super_admin') ? [
                 'name' => ['required', 'string', 'max:100', Rule::unique('departments')->ignore($department)],
@@ -134,33 +172,54 @@ class DepartmentController extends Controller
             ] : []),
             'description' => ['nullable', 'string', 'max:255'],
             'about' => ['nullable', 'string', 'max:3000'],
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            'about_label' => ['nullable', 'string', 'max:50'],
+            'about_title' => ['nullable', 'string', 'max:100'],
+            'about_accent' => ['nullable', 'string', 'max:60'],
+            'image' => $picture,
+            'about_image' => $picture,
+            'about_small_image' => $picture,
         ]);
 
+        $pictures = collect(['image', 'about_image', 'about_small_image'])
+            ->mapWithKeys(fn (string $field) => [
+                $field => $request->hasFile($field)
+                    ? PostImage::store($request->file($field), $department->{$field})
+                    : $department->{$field},
+            ]);
+
         $department->update([
-            ...Arr::except($validated, 'image'),
-            'image' => $request->hasFile('image')
-                ? PostImage::store($request->file('image'), $department->image)
-                : $department->image,
+            ...Arr::except($validated, $pictures->keys()->all()),
+            ...$pictures,
         ]);
 
         return back()->with('success', 'Department page saved.');
     }
 
     /**
-     * Give an active user a department office. Each office has one holder.
+     * Give an active user a department office. Each office has one holder. A Head
+     * can only appoint their own members, and the Head's office itself is left to
+     * a super admin.
      */
     public function assignAdmin(Request $request, Department $department): RedirectResponse
     {
+        abort_unless($request->user()->leadsDepartment($department->id), 403);
+
+        $isSuperAdmin = $request->user()->hasRole('super_admin');
+
         $validated = $request->validate([
-            'user_id' => ['required', Rule::exists('users', 'id')->where('status', 'active')],
-            'office' => ['nullable', Rule::in(Offices::roles())],
+            'user_id' => ['required', Rule::exists('users', 'id')->where('status', 'active')
+                ->when(! $isSuperAdmin, fn ($rule) => $rule->where('department_id', $department->id))],
+            'office' => [
+                $isSuperAdmin ? 'nullable' : 'required',
+                Rule::in($isSuperAdmin ? Offices::roles() : array_diff(Offices::roles(), [Offices::HEAD])),
+            ],
         ]);
 
         $office = $validated['office'] ?? Offices::HEAD;
         $user = User::findOrFail($validated['user_id']);
 
         abort_if($user->hasRole('super_admin'), 422, 'A super admin can not hold a department office.');
+        abort_if(! $isSuperAdmin && $user->hasRole(Offices::HEAD), 403);
 
         $holder = User::role($office)->where('department_id', $department->id)->whereKeyNot($user->id)->first();
 
@@ -179,13 +238,15 @@ class DepartmentController extends Controller
     /**
      * Return an officer to being a regular member of the department.
      */
-    public function removeAdmin(Department $department, User $user): RedirectResponse
+    public function removeAdmin(Request $request, Department $department, User $user): RedirectResponse
     {
+        abort_unless($request->user()->leadsDepartment($department->id), 403);
         abort_unless($user->department_id === $department->id && $user->isOfficer(), 404);
+        abort_if(! $request->user()->hasRole('super_admin') && $user->hasRole(Offices::HEAD), 403);
 
         $user->syncRoles(['member']);
 
-        return back();
+        return back()->with('success', "{$user->full_name} is now a member.");
     }
 
     /**

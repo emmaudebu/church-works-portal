@@ -1,4 +1,4 @@
-import Avatar from '@/Components/Avatar';
+import PhotoPreview from '@/Components/Members/PhotoPreview';
 import EmptyState from '@/Components/EmptyState';
 import InputLabel from '@/Components/InputLabel';
 import {
@@ -99,7 +99,7 @@ export default function Show({
 
             <div className="max-w-4xl space-y-6">
                 <section className="card flex flex-wrap items-center gap-4 border-t-2 border-gold-500 p-4 sm:p-6">
-                    <Avatar
+                    <PhotoPreview
                         name={member.full_name}
                         src={member.photo_url}
                         className="h-20 w-20 text-xl"

@@ -16,7 +16,7 @@ const PAGES: Record<
         title: 'News, Events and Announcements',
         eyebrow: "What's happening",
         image: '/images/site/gathering.jpg',
-        text: 'Everything happening across the workforce.',
+        text: 'Everything happening across the department.',
     },
     news: {
         title: 'News',
@@ -32,7 +32,7 @@ const PAGES: Record<
     },
     announcement: {
         title: 'Announcements',
-        eyebrow: 'For the workforce',
+        eyebrow: 'For the team',
         image: '/images/site/sunrise.jpg',
         text: 'Important notices for members.',
     },

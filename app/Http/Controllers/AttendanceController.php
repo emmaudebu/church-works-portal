@@ -8,6 +8,7 @@ use App\Models\Service;
 use App\Models\User;
 use App\Support\AttendanceStats;
 use App\Support\Ballot;
+use App\Support\BestMembers;
 use App\Support\Dues;
 use App\Support\ServiceGenerator;
 use Illuminate\Http\Request;
@@ -64,6 +65,7 @@ class AttendanceController extends Controller
                     'time' => $row->checked_in_at->format('g:i A'),
                 ]),
             'month' => $month,
+            'bestMember' => BestMembers::forDepartments($departments)->first()?->toCard(),
             'nextService' => $next ? [
                 'title' => $next->title,
                 'date_label' => $next->date->format('l j F'),

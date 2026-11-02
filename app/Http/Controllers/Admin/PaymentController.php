@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Support\CurrentDepartment;
 use App\Support\Dues;
+use App\Support\PaymentReviews;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -42,24 +43,7 @@ class PaymentController extends Controller
             ]),
             'selected' => $selected?->id,
             'report' => $selected ? $this->report($selected, $this->period($request, $selected)) : null,
-            'reviews' => Payment::whereIn('due_id', $dues->pluck('id'))
-                ->where('status', 'under_review')
-                ->with('user:id,full_name')
-                ->oldest()
-                ->get()
-                ->groupBy(fn (Payment $payment) => $payment->batch ?? $payment->reference)
-                ->map(function ($payments) use ($admin) {
-                    $first = $payments->first();
-
-                    return [
-                        ...$first->toRow(),
-                        'period' => Dues::rangeLabel($payments->pluck('period')->sort()->values()->all()),
-                        'amount' => $payments->sum('amount'),
-                        'submitted_at' => $first->created_at->format('j M Y, g:i A'),
-                        'own' => $first->user_id === $admin->id,
-                    ];
-                })
-                ->values(),
+            'reviews' => PaymentReviews::list($admin),
             'transactions' => Payment::whereIn('due_id', $dues->pluck('id'))
                 ->where('status', 'success')
                 ->with('user:id,full_name')
@@ -67,7 +51,7 @@ class PaymentController extends Controller
                 ->limit(30)
                 ->get()
                 ->map->toRow(),
-            'canCreate' => CurrentDepartment::idFor($admin) !== null,
+            'canCreate' => CurrentDepartment::forNewRecords($admin) !== null,
         ]);
     }
 
@@ -91,7 +75,7 @@ class PaymentController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $departmentId = CurrentDepartment::idFor($request->user());
+        $departmentId = CurrentDepartment::forNewRecords($request->user());
 
         abort_unless($departmentId, 422, 'Choose a department first.');
 
@@ -193,7 +177,11 @@ class PaymentController extends Controller
     {
         $this->authorizeReview($request, $payment);
 
-        $payment->withBatch()->each(fn (Payment $row) => Dues::markPaid($row, $request->user()));
+        $payments = $payment->withBatch();
+
+        $payments->each(fn (Payment $row) => Dues::markPaid($row, $request->user()));
+
+        PaymentReviews::notifyMember($payments, approved: true);
 
         return back()->with('success', 'Payment approved.');
     }
@@ -207,11 +195,15 @@ class PaymentController extends Controller
 
         $validated = $request->validate(['reason' => ['required', 'string', 'max:255']]);
 
-        $payment->withBatch()->each->update([
+        $payments = $payment->withBatch();
+
+        $payments->each->update([
             'status' => 'rejected',
             'rejection_reason' => $validated['reason'],
             'recorded_by' => $request->user()->id,
         ]);
+
+        PaymentReviews::notifyMember($payments, approved: false);
 
         return back()->with('success', 'Receipt rejected.');
     }

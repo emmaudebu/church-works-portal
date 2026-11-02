@@ -40,7 +40,7 @@ class DatabaseSeeder extends Seeder
             return;
         }
 
-        $technicalUnit = Department::firstWhere('slug', 'technical-unit');
+        $technicalUnit = Department::firstWhere('slug', 'technical-department');
 
         User::updateOrCreate(
             ['email' => 'deptadmin@covenantworkforce.test'],
@@ -118,7 +118,7 @@ class DatabaseSeeder extends Seeder
 
         foreach ([
             ['news', 'New sound desk installed', 'The main auditorium now has a new digital sound desk. Training starts soon.', null, null],
-            ['event', 'Technical Unit workshop', 'A hands-on workshop for all units. Please bring a notebook.', now()->addDays(9)->setTime(10, 0), 'Main Auditorium'],
+            ['event', 'Technical Department workshop', 'A hands-on workshop for all units. Please bring a notebook.', now()->addDays(9)->setTime(10, 0), 'Main Auditorium'],
             ['event', 'Workforce retreat', 'A day of prayer and fellowship for the whole workforce.', now()->addDays(21)->setTime(9, 0), 'Faith Tabernacle Annex'],
             ['announcement', 'Rehearsal moved to Saturday', 'This week rehearsal holds on Saturday at 4 PM.', null, null],
             ['announcement', 'Update your details', 'Please make sure your next of kin details are current.', null, null],

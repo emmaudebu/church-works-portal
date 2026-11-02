@@ -10,7 +10,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 beforeEach(function () {
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
-    $technical = Department::firstWhere('slug', 'technical-unit');
+    $technical = Department::firstWhere('slug', 'technical-department');
     $choir = Department::firstWhere('slug', 'choir');
 
     $this->admin = User::factory()->create(['department_id' => $technical->id])->assignRole('dept_admin');
@@ -69,7 +69,7 @@ test('the id card shows the member details', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('IdCard')
             ->where('member.full_name', $this->member->full_name)
-            ->where('member.department', 'Technical Unit'));
+            ->where('member.department', 'Technical Department'));
 });
 
 test('a member can not open someone else id card', function () {

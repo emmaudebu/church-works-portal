@@ -9,6 +9,7 @@ use App\Support\CurrentDepartment;
 use App\Support\ServiceGenerator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -22,6 +23,7 @@ class ServiceController extends Controller
         ServiceGenerator::generate();
 
         $admin = $request->user();
+        $isSuperAdmin = $admin->hasRole('super_admin');
 
         return Inertia::render('Admin/Services', [
             'services' => Service::managedBy($admin)
@@ -33,6 +35,7 @@ class ServiceController extends Controller
                 ->paginate(20)
                 ->through(fn (Service $service) => [
                     ...$service->only(['id', 'type', 'title', 'is_open', 'attendance_count']),
+                    'recurring' => $service->recurring_key !== null,
                     'date' => $service->date->toDateString(),
                     'date_label' => $service->date->format('D j M Y'),
                     'opens_at' => $service->opens_at->format('H:i'),
@@ -40,9 +43,9 @@ class ServiceController extends Controller
                     'department' => $service->department->name,
                     'accepting' => $service->acceptsCheckIns(),
                     'can_open' => $service->date->lte(today()),
-                    'can_delete' => $service->recurring_key === null && $service->attendance_count === 0,
+                    'can_delete' => $isSuperAdmin || ($service->recurring_key === null && $service->attendance_count === 0),
                 ]),
-            'canCreate' => CurrentDepartment::idFor($admin) !== null,
+            'canCreate' => CurrentDepartment::forNewRecords($admin) !== null,
         ]);
     }
 
@@ -51,7 +54,7 @@ class ServiceController extends Controller
      */
     public function store(ServiceRequest $request): RedirectResponse
     {
-        $departmentId = CurrentDepartment::idFor($request->user());
+        $departmentId = CurrentDepartment::forNewRecords($request->user());
 
         abort_unless($departmentId, 422, 'Choose a department first.');
 
@@ -99,15 +102,24 @@ class ServiceController extends Controller
     }
 
     /**
-     * Delete a special service that nobody attended. Recurring ones are closed
-     * instead, because the generator would only create them again.
+     * Delete a service. Officers can only delete a special service nobody
+     * attended. A super admin can delete any, along with its attendance, and a
+     * recurring one stays deleted rather than being generated again.
      */
     public function destroy(Request $request, Service $service): RedirectResponse
     {
-        abort_unless($request->user()->canAccessDepartment($service->department_id), 404);
-        abort_unless($service->recurring_key === null && ! $service->attendance()->exists(), 422);
+        $user = $request->user();
 
-        $service->delete();
+        abort_unless($user->canAccessDepartment($service->department_id), 404);
+        abort_unless(
+            $user->hasRole('super_admin') || ($service->recurring_key === null && ! $service->attendance()->exists()),
+            422,
+        );
+
+        DB::transaction(function () use ($service) {
+            $service->attendance()->delete();
+            $service->delete();
+        });
 
         return back()->with('success', 'Service deleted.');
     }

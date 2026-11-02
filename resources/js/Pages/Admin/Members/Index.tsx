@@ -1,10 +1,10 @@
 import ActionMenu, { Action } from '@/Components/ActionMenu';
-import Avatar from '@/Components/Avatar';
 import EmptyState from '@/Components/EmptyState';
 import {
     approveMembers,
     useMemberActions,
 } from '@/Components/Members/MemberActions';
+import PhotoPreview from '@/Components/Members/PhotoPreview';
 import Pagination, { PageLink } from '@/Components/Pagination';
 import PrimaryButton from '@/Components/PrimaryButton';
 import StatusBadge from '@/Components/StatusBadge';
@@ -257,7 +257,7 @@ export default function Index({
                                             </td>
                                             <td className="p-3">
                                                 <div className="flex items-center gap-3">
-                                                    <Avatar
+                                                    <PhotoPreview
                                                         name={member.full_name}
                                                         src={member.photo_url}
                                                     />
@@ -299,7 +299,7 @@ export default function Index({
                                     className="card flex items-center gap-3 p-4"
                                 >
                                     {checkbox(member)}
-                                    <Avatar
+                                    <PhotoPreview
                                         name={member.full_name}
                                         src={member.photo_url}
                                         className="h-11 w-11 shrink-0 text-sm"

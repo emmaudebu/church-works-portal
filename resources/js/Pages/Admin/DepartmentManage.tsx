@@ -1,6 +1,7 @@
 import DangerButton from '@/Components/DangerButton';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import OfficersPanel, { Officer, Person } from '@/Components/OfficersPanel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
@@ -94,7 +95,8 @@ function BankForm({
         <section className="card p-4 sm:p-6">
             <h2 className="text-xl">Bank account</h2>
             <p className="mt-1 text-sm text-neutral-600">
-                Members transfer dues here. Only a super admin can change it.
+                Members transfer dues here. Only the Head of Department or a
+                super admin can change it.
             </p>
 
             {canEdit ? (
@@ -311,21 +313,57 @@ function GalleryItem({ image }: { image: GalleryImage }) {
     );
 }
 
+const PICTURES_PER_UPLOAD = 12;
+
+/** Stays under the server's 32 MB limit for one request. */
+const BYTES_PER_UPLOAD = 24 * 1024 * 1024;
+
+function uploadBatches(files: File[]): File[][] {
+    const batches: File[][] = [];
+    let batch: File[] = [];
+    let size = 0;
+
+    for (const file of files) {
+        if (
+            batch.length > 0 &&
+            (batch.length === PICTURES_PER_UPLOAD ||
+                size + file.size > BYTES_PER_UPLOAD)
+        ) {
+            batches.push(batch);
+            batch = [];
+            size = 0;
+        }
+
+        batch.push(file);
+        size += file.size;
+    }
+
+    return batch.length > 0 ? [...batches, batch] : batches;
+}
+
 export default function DepartmentManage({
     department,
     canEditBank,
     units,
     images,
+    officeManager,
 }: {
     department: { name: string; slug: string } & PageContent & Bank;
     canEditBank: boolean;
     units: Unit[];
     images: GalleryImage[];
+    officeManager: {
+        officers: Officer[];
+        candidates: Person[];
+        offices: Record<string, string>;
+    } | null;
 }) {
     const errors = usePage().props.errors as Record<string, string>;
 
     const unit = useForm({ name: '' });
-    const upload = useForm<{ images: File[] }>({ images: [] });
+    const [pictures, setPictures] = useState<File[]>([]);
+    const [uploading, setUploading] = useState<string | null>(null);
+    const [pickerKey, setPickerKey] = useState(0);
 
     const addUnit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -336,17 +374,46 @@ export default function DepartmentManage({
         });
     };
 
+    /** Large selections go up a few at a time so no request is too big. */
     const addImages: FormEventHandler = (e) => {
         e.preventDefault();
 
-        upload.post(route('admin.gallery.store', department.id), {
-            forceFormData: true,
-            preserveScroll: true,
-            onSuccess: () => upload.reset(),
-        });
+        const batches = uploadBatches(pictures);
+
+        const send = (index: number) => {
+            setUploading(
+                batches.length > 1
+                    ? `Uploading part ${index + 1} of ${batches.length}...`
+                    : 'Uploading...',
+            );
+
+            router.post(
+                route('admin.gallery.store', department.id),
+                { images: batches[index] },
+                {
+                    forceFormData: true,
+                    preserveScroll: true,
+                    preserveState: true,
+                    onSuccess: () => {
+                        if (index + 1 < batches.length) {
+                            send(index + 1);
+
+                            return;
+                        }
+
+                        setPictures([]);
+                        setPickerKey((key) => key + 1);
+                        setUploading(null);
+                    },
+                    onError: () => setUploading(null),
+                },
+            );
+        };
+
+        send(0);
     };
 
-    const uploadError = Object.entries(upload.errors).find(([key]) =>
+    const uploadError = Object.entries(errors).find(([key]) =>
         key.startsWith('images'),
     )?.[1];
 
@@ -370,6 +437,22 @@ export default function DepartmentManage({
             </div>
 
             <div className="mt-6 max-w-4xl space-y-6">
+                {officeManager && (
+                    <section className="card p-4 sm:p-6">
+                        <h2 className="text-xl">Department officers</h2>
+                        <p className="mt-1 text-sm text-neutral-600">
+                            Give a member an office. What each office can do is
+                            set in the office permissions.
+                        </p>
+                        <OfficersPanel
+                            departmentId={department.id}
+                            officers={officeManager.officers}
+                            candidates={officeManager.candidates}
+                            offices={officeManager.offices}
+                        />
+                    </section>
+                )}
+
                 <PageForm department={department} />
 
                 <BankForm
@@ -427,28 +510,38 @@ export default function DepartmentManage({
 
                     <form onSubmit={addImages} className="mt-4 space-y-3">
                         <label className="block text-sm font-medium">
-                            Add pictures (up to 12 at a time)
+                            Add pictures (choose as many as you like)
                             <input
+                                key={pickerKey}
                                 type="file"
                                 multiple
                                 accept="image/jpeg,image/png,image/webp"
                                 onChange={(e) =>
-                                    upload.setData('images', [
-                                        ...(e.target.files ?? []),
-                                    ])
+                                    setPictures([...(e.target.files ?? [])])
                                 }
                                 className="mt-1 block w-full text-sm font-normal"
                             />
                         </label>
                         <InputError message={uploadError} />
-                        <PrimaryButton
-                            disabled={
-                                upload.processing ||
-                                upload.data.images.length === 0
-                            }
-                        >
-                            Upload
-                        </PrimaryButton>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <PrimaryButton
+                                disabled={
+                                    uploading !== null || pictures.length === 0
+                                }
+                            >
+                                {pictures.length > 1
+                                    ? `Upload ${pictures.length} pictures`
+                                    : 'Upload'}
+                            </PrimaryButton>
+                            {uploading && (
+                                <span
+                                    role="status"
+                                    className="text-sm text-neutral-600"
+                                >
+                                    {uploading}
+                                </span>
+                            )}
+                        </div>
                     </form>
 
                     {images.length > 0 && (

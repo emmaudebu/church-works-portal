@@ -176,36 +176,38 @@ export default function Register({
 
                 {step === 1 && (
                     <>
-                        <div>
-                            <InputLabel
-                                htmlFor="department_id"
-                                value="Department"
-                            />
-                            <select
-                                id="department_id"
-                                value={data.department_id}
-                                required
-                                onChange={(e) =>
-                                    setData({
-                                        ...data,
-                                        department_id: e.target.value,
-                                        unit: '',
-                                    })
-                                }
-                                className="mt-1 block w-full rounded-lg border-neutral-200 focus:border-primary-700 focus:ring-primary-700"
-                            >
-                                <option value="">Choose</option>
-                                {departments.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                        {item.name}
-                                    </option>
-                                ))}
-                            </select>
-                            <InputError
-                                message={errors.department_id}
-                                className="mt-2"
-                            />
-                        </div>
+                        {departments.length !== 1 && (
+                            <div>
+                                <InputLabel
+                                    htmlFor="department_id"
+                                    value="Department"
+                                />
+                                <select
+                                    id="department_id"
+                                    value={data.department_id}
+                                    required
+                                    onChange={(e) =>
+                                        setData({
+                                            ...data,
+                                            department_id: e.target.value,
+                                            unit: '',
+                                        })
+                                    }
+                                    className="mt-1 block w-full rounded-lg border-neutral-200 focus:border-primary-700 focus:ring-primary-700"
+                                >
+                                    <option value="">Choose</option>
+                                    {departments.map((item) => (
+                                        <option key={item.id} value={item.id}>
+                                            {item.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <InputError
+                                    message={errors.department_id}
+                                    className="mt-2"
+                                />
+                            </div>
+                        )}
                         <ChurchFields
                             form={form}
                             units={department?.units}

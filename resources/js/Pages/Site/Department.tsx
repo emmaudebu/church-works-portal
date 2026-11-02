@@ -2,6 +2,9 @@ import Badge from '@/Components/Badge';
 import DepartmentCard from '@/Components/DepartmentCard';
 import DepartmentIcon from '@/Components/DepartmentIcon';
 import PostCard from '@/Components/PostCard';
+import BestMemberSpotlight, {
+    Spotlight,
+} from '@/Components/Site/BestMemberSpotlight';
 import CountUp from '@/Components/Site/CountUp';
 import Embers from '@/Components/Site/Embers';
 import Gallery from '@/Components/Site/Gallery';
@@ -35,6 +38,7 @@ const SAMPLE_GALLERY: GalleryImage[] = [
 
 export default function Department({
     department,
+    bestMember,
     units,
     gallery,
     officers,
@@ -44,6 +48,7 @@ export default function Department({
     others,
 }: {
     department: DepartmentData;
+    bestMember: Spotlight | null;
     units: string[];
     gallery: GalleryImage[];
     officers: Officer[];
@@ -54,6 +59,12 @@ export default function Department({
 }) {
     const active = department.status === 'active';
     const pictures = gallery.length > 0 ? gallery : SAMPLE_GALLERY;
+
+    const aboutTitle =
+        department.about_title ?? (active ? 'What we' : 'Opening');
+    const aboutAccent =
+        department.about_accent ??
+        (department.about_title ? null : active ? 'do' : 'soon');
 
     const stats = [
         { label: 'Members', value: department.members_count },
@@ -69,6 +80,18 @@ export default function Department({
         ...(events.length > 0 ? [{ id: 'events', label: 'Events' }] : []),
         ...(news.length > 0 ? [{ id: 'news', label: 'News' }] : []),
     ];
+
+    /** The best member always sits just before the last section. */
+    const lastSection = sections[sections.length - 1].id;
+
+    const spotlight = bestMember && <BestMemberSpotlight winner={bestMember} />;
+
+    if (bestMember) {
+        sections.splice(sections.length - 1, 0, {
+            id: 'best-member',
+            label: 'Best Member',
+        });
+    }
 
     return (
         <PublicLayout>
@@ -157,11 +180,13 @@ export default function Department({
                 className="mx-auto grid max-w-7xl scroll-mt-28 items-center gap-10 px-4 py-16 md:px-8 lg:grid-cols-2"
             >
                 <div className="reveal">
-                    <p className="eyebrow">About us</p>
+                    <p className="eyebrow">
+                        {department.about_label ?? 'About us'}
+                    </p>
                     <h2 className="mt-2 text-3xl md:text-4xl">
-                        {active ? 'What we ' : 'Opening '}
+                        {aboutTitle}{' '}
                         <em className="font-medium text-primary-700">
-                            {active ? 'do' : 'soon'}
+                            {aboutAccent}
                         </em>
                     </h2>
                     <p className="mt-4 whitespace-pre-line text-lg text-neutral-600">
@@ -189,13 +214,16 @@ export default function Department({
 
                 <div className="reveal relative mx-auto w-full max-w-md">
                     <img
-                        src={pictures[0].url}
+                        src={department.about_image_url ?? pictures[0].url}
                         alt=""
                         loading="lazy"
                         className="aspect-[4/5] w-4/5 rounded-t-full object-cover shadow-soft"
                     />
                     <img
-                        src={pictures[1 % pictures.length].url}
+                        src={
+                            department.about_small_image_url ??
+                            pictures[1 % pictures.length].url
+                        }
                         alt=""
                         loading="lazy"
                         className="absolute -bottom-4 right-0 h-40 w-40 animate-float rounded-full border-4 border-white object-cover shadow-soft"
@@ -216,10 +244,15 @@ export default function Department({
                             title="Meet Our"
                             accent="Members"
                         />
-                        <MemberCarousel members={team} />
+                        <MemberCarousel
+                            members={team}
+                            department={department.name}
+                        />
                     </div>
                 </section>
             )}
+
+            {lastSection === 'gallery' && spotlight}
 
             <section
                 id="gallery"
@@ -232,6 +265,8 @@ export default function Department({
                 />
                 <Gallery images={pictures} />
             </section>
+
+            {lastSection === 'events' && spotlight}
 
             {events.length > 0 && (
                 <section
@@ -252,6 +287,8 @@ export default function Department({
                     </div>
                 </section>
             )}
+
+            {lastSection === 'news' && spotlight}
 
             {news.length > 0 && (
                 <section

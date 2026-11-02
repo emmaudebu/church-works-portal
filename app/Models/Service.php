@@ -10,12 +10,13 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['department_id', 'type', 'recurring_key', 'title', 'date', 'opens_at', 'closes_at', 'is_open'])]
 class Service extends Model
 {
     /** @use HasFactory<ServiceFactory> */
-    use HasFactory, ManagedByDepartment;
+    use HasFactory, ManagedByDepartment, SoftDeletes;
 
     /**
      * Get the attributes that should be cast.

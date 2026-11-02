@@ -3,6 +3,7 @@
 use App\Models\Department;
 use App\Models\User;
 use App\Support\CurrentDepartment;
+use App\Support\MemberPhoto;
 use Database\Seeders\DepartmentSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Http\UploadedFile;
@@ -15,7 +16,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 beforeEach(function () {
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
     $this->choir = Department::firstWhere('slug', 'choir');
 
     $this->superAdmin = User::factory()->create()->assignRole('super_admin');
@@ -243,6 +244,20 @@ test('a member of a coming soon department can still be edited by a super admin'
     $this->actingAs($this->superAdmin)
         ->patch(route('admin.members.update', $this->member), bioPayload($this->member, ['department_id' => $this->choir->id, 'member_id' => 'CW-8888']))
         ->assertSessionHasErrors('department_id');
+});
+
+test('a passport shaped photo keeps its shape and a wide one that skipped the cropper is squared', function () {
+    Storage::fake('local');
+
+    $size = function (int $width, int $height) {
+        $path = MemberPhoto::store(UploadedFile::fake()->image('photo.jpg', $width, $height));
+
+        return array_slice(getimagesizefromstring(Storage::disk('local')->get($path)), 0, 2);
+    };
+
+    expect($size(1200, 1600))->toBe([600, 800])
+        ->and($size(1600, 900))->toBe([600, 600])
+        ->and($size(400, 1200))->toBe([600, 600]);
 });
 
 test('replacing a photo removes the old file', function () {

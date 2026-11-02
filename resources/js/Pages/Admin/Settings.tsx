@@ -7,7 +7,7 @@ import VerseToast from '@/Components/Site/VerseToast';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { HomeContent, HomeSlide, PageProps, SitePopupData, VerseToastData } from '@/types';
+import { HomeContent, HomeSlide, JoinStep, PageProps, SitePopupData, VerseToastData } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler, PropsWithChildren, useState } from 'react';
 
@@ -430,6 +430,11 @@ type SlideForm = Omit<HomeSlide, 'id' | 'image'> & {
     image: File | null;
 };
 
+type JoinStepForm = Omit<JoinStep, 'image'> & {
+    preview: string;
+    image: File | null;
+};
+
 function ImagePicker({
     id,
     label,
@@ -476,6 +481,7 @@ function HomepageForm({ home }: { home: HomeContent }) {
             image: File | null;
             small_image: File | null;
         };
+        join: Omit<HomeContent['join'], 'steps'> & { steps: JoinStepForm[] };
     }>({
         slides: home.slides.map((slide) => ({
             ...slide,
@@ -483,6 +489,14 @@ function HomepageForm({ home }: { home: HomeContent }) {
             image: null,
         })),
         welcome: { ...home.welcome, image: null, small_image: null },
+        join: {
+            ...home.join,
+            steps: home.join.steps.map((step) => ({
+                ...step,
+                preview: step.image,
+                image: null,
+            })),
+        },
     });
 
     const errors = form.errors as Record<string, string>;
@@ -531,6 +545,19 @@ function HomepageForm({ home }: { home: HomeContent }) {
         });
     };
 
+    const changeJoin = (
+        field: 'eyebrow' | 'title' | 'accent' | 'text',
+        value: string,
+    ) => form.setData('join', { ...form.data.join, [field]: value });
+
+    const changeStep = (index: number, changes: Partial<JoinStepForm>) =>
+        form.setData('join', {
+            ...form.data.join,
+            steps: form.data.join.steps.map((step, position) =>
+                position === index ? { ...step, ...changes } : step,
+            ),
+        });
+
     const addSlide = () =>
         form.setData('slides', [
             ...form.data.slides,
@@ -555,6 +582,14 @@ function HomepageForm({ home }: { home: HomeContent }) {
 
                 return slide;
             }),
+            join: {
+                ...data.join,
+                steps: data.join.steps.map(({ preview, ...step }) => {
+                    void preview;
+
+                    return step;
+                }),
+            },
         }));
 
         form.post(route('admin.settings.home'), {
@@ -585,7 +620,7 @@ function HomepageForm({ home }: { home: HomeContent }) {
     return (
         <Panel
             title="Homepage"
-            description="Change the slider and the welcome section. The Next event and Latest news card fills in by itself from your posts."
+            description="Change the slider, the welcome section and the join the team section. The Next event and Latest news card fills in by itself from your posts."
         >
             <form onSubmit={submit} className="space-y-6">
                 <section>
@@ -749,6 +784,84 @@ function HomepageForm({ home }: { home: HomeContent }) {
                             errors['welcome.button_link'],
                         )}
                     </div>
+                </section>
+
+                <section className="space-y-3 border-t border-neutral-200 pt-4">
+                    <h3 className="font-sans text-sm font-semibold">
+                        Join the team section
+                    </h3>
+                    {text(
+                        'join-eyebrow',
+                        'Small label',
+                        form.data.join.eyebrow,
+                        (value) => changeJoin('eyebrow', value),
+                        errors['join.eyebrow'],
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {text(
+                            'join-title',
+                            'Heading',
+                            form.data.join.title,
+                            (value) => changeJoin('title', value),
+                            errors['join.title'],
+                        )}
+                        {text(
+                            'join-accent',
+                            'Red italic words',
+                            form.data.join.accent,
+                            (value) => changeJoin('accent', value),
+                            errors['join.accent'],
+                        )}
+                    </div>
+                    {text(
+                        'join-text',
+                        'Sentence under the heading',
+                        form.data.join.text,
+                        (value) => changeJoin('text', value),
+                        errors['join.text'],
+                    )}
+                    {form.data.join.steps.map((step, index) => (
+                        <fieldset
+                            key={index}
+                            className="grid gap-3 rounded-lg bg-neutral-50 p-3 sm:grid-cols-2"
+                        >
+                            <legend className="sr-only">
+                                Step {index + 1}
+                            </legend>
+                            <ImagePicker
+                                id={`join-step-${index}-image`}
+                                label={`Step ${index + 1} picture`}
+                                preview={step.preview}
+                                onChange={(file) =>
+                                    changeStep(index, {
+                                        image: file,
+                                        preview: file
+                                            ? URL.createObjectURL(file)
+                                            : step.preview,
+                                    })
+                                }
+                                error={errors[`join.steps.${index}.image`]}
+                            />
+                            <div className="space-y-3">
+                                {text(
+                                    `join-step-${index}-title`,
+                                    'Step title',
+                                    step.title,
+                                    (value) =>
+                                        changeStep(index, { title: value }),
+                                    errors[`join.steps.${index}.title`],
+                                )}
+                                {text(
+                                    `join-step-${index}-text`,
+                                    'Step sentence',
+                                    step.text,
+                                    (value) =>
+                                        changeStep(index, { text: value }),
+                                    errors[`join.steps.${index}.text`],
+                                )}
+                            </div>
+                        </fieldset>
+                    ))}
                 </section>
 
                 <PrimaryButton disabled={form.processing}>Save</PrimaryButton>

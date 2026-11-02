@@ -5,6 +5,7 @@ namespace App\Models;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Support\CurrentDepartment;
 use App\Support\Offices;
+use App\Support\Socials;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -23,7 +24,7 @@ use Spatie\Permission\Traits\HasRoles;
     'department_id', 'member_id', 'full_name', 'gender', 'date_of_birth', 'phone', 'email',
     'address', 'photo', 'unit', 'date_joined', 'foundation_class_done', 'foundation_certificate',
     'wofbi_done', 'wofbi_certificate',
-    'password', 'status', 'suspension_reason', 'show_on_site',
+    'password', 'status', 'suspension_reason', 'show_on_site', 'socials',
 ])]
 #[Hidden(['password', 'remember_token', 'qr_token'])]
 class User extends Authenticatable
@@ -57,6 +58,7 @@ class User extends Authenticatable
             'wofbi_done' => 'boolean',
             'must_change_password' => 'boolean',
             'show_on_site' => 'boolean',
+            'socials' => 'array',
         ];
     }
 
@@ -173,6 +175,16 @@ class User extends Authenticatable
     }
 
     /**
+     * The contact links for public pages, only for those who allow it.
+     *
+     * @return list<array{network: string, url: string}>
+     */
+    public function publicSocials(): array
+    {
+        return $this->show_on_site ? Socials::links($this->socials) : [];
+    }
+
+    /**
      * The next automatic workforce ID, stepping past any that an admin typed by hand.
      */
     public static function nextMemberId(User $user): string
@@ -210,6 +222,16 @@ class User extends Authenticatable
     public function office(): ?string
     {
         return Offices::LABELS[$this->getRoleNames()->first(fn (string $role) => isset(Offices::LABELS[$role]))] ?? null;
+    }
+
+    /**
+     * Whether this person may give out offices and set the bank account of a
+     * department: a super admin anywhere, or the Head of that department.
+     */
+    public function leadsDepartment(int $departmentId): bool
+    {
+        return $this->hasRole('super_admin')
+            || ($this->hasRole(Offices::HEAD) && $this->department_id === $departmentId);
     }
 
     /**
