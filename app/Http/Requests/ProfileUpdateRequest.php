@@ -4,11 +4,24 @@ namespace App\Http\Requests;
 
 use App\Models\User;
 use App\Support\MemberRules;
+use App\Support\Socials;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Validation\Rule;
 
 class ProfileUpdateRequest extends MemberRequest
 {
+    /**
+     * Tidy the social links as well as the phone numbers.
+     */
+    protected function prepareForValidation(): void
+    {
+        parent::prepareForValidation();
+
+        if (is_array($this->input('socials'))) {
+            $this->merge(['socials' => Socials::normalize($this->input('socials'))]);
+        }
+    }
+
     /**
      * Get the validation rules that apply to the request.
      *
@@ -32,6 +45,7 @@ class ProfileUpdateRequest extends MemberRequest
             ...MemberRules::emergencyAndExtra(),
             'photo' => ['nullable', ...MemberRules::photo()],
             'show_on_site' => ['boolean'],
+            ...MemberRules::socials(),
         ];
     }
 }

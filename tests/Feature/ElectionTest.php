@@ -18,7 +18,7 @@ use Inertia\Testing\AssertableInertia as Assert;
 beforeEach(function () {
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
     $this->choir = Department::firstWhere('slug', 'choir');
 
     $this->admin = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
@@ -229,10 +229,12 @@ test('closing must come after opening', function () {
     ])->assertSessionHasErrors('ends_at');
 });
 
-test('a super admin must pick a department before creating an election', function () {
+test('with several departments a super admin must pick one before creating an election', function () {
     $superAdmin = User::factory()->create()->assignRole('super_admin');
 
     $payload = ['title' => 'X', 'starts_at' => now()->addDay()->toDateTimeString(), 'ends_at' => now()->addDays(2)->toDateTimeString()];
+
+    Department::factory()->create();
 
     $this->actingAs($superAdmin)->post(route('admin.elections.store'), $payload)->assertStatus(422);
 

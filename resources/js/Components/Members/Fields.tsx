@@ -3,6 +3,8 @@ import InputLabel from '@/Components/InputLabel';
 import TextInput from '@/Components/TextInput';
 import { ChangeEvent, PropsWithChildren, useState } from 'react';
 
+const MAX_CERTIFICATE_BYTES = 8 * 1024 * 1024;
+
 export type BioData = {
     full_name: string;
     gender: string;
@@ -146,6 +148,19 @@ function YesNo({
     label: string;
 }) {
     const id = `${certificate}-input`;
+    const [tooLarge, setTooLarge] = useState(false);
+
+    const choose = (e: ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        const fits = !file || file.size <= MAX_CERTIFICATE_BYTES;
+
+        setTooLarge(!fits);
+        form.set(certificate, fits ? file : null);
+
+        if (!fits) {
+            e.target.value = '';
+        }
+    };
 
     return (
         <fieldset>
@@ -189,9 +204,7 @@ function YesNo({
                         id={id}
                         type="file"
                         accept="application/pdf,image/jpeg,image/png,image/webp"
-                        onChange={(e) =>
-                            form.set(certificate, e.target.files?.[0] ?? null)
-                        }
+                        onChange={choose}
                         className="mt-1 block w-full text-sm"
                     />
                     {form.data[certificate] && (
@@ -200,7 +213,11 @@ function YesNo({
                         </p>
                     )}
                     <InputError
-                        message={form.errors[certificate]}
+                        message={
+                            tooLarge
+                                ? 'That file is too large. Please use one up to 8 MB.'
+                                : form.errors[certificate]
+                        }
                         className="mt-2"
                     />
                 </div>

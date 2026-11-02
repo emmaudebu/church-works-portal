@@ -102,8 +102,8 @@ function SidebarNav({
     collapsed: boolean;
     isSuperAdmin: boolean;
 }) {
-    const { department_id: departmentId, permissions } =
-        usePage<PageProps>().props.auth.user;
+    const { auth, pendingReceipts } = usePage<PageProps>().props;
+    const { department_id: departmentId, permissions } = auth.user;
 
     const ownDepartment =
         !isSuperAdmin &&
@@ -157,6 +157,19 @@ function SidebarNav({
                                 className="shrink-0"
                             />
                             {!collapsed && item.label}
+                            {item.route === 'admin.payments' &&
+                                pendingReceipts > 0 && (
+                                    <span
+                                        title="Proofs of payment to approve"
+                                        className="ml-auto rounded-full bg-gold-500 px-2 py-0.5 text-xs font-semibold tabular-nums text-neutral-900"
+                                    >
+                                        {pendingReceipts}
+                                        <span className="sr-only">
+                                            {' '}
+                                            to approve
+                                        </span>
+                                    </span>
+                                )}
                         </Link>
                     );
                 })}

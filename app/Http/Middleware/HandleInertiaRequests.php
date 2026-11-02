@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Department;
 use App\Support\CurrentDepartment;
 use App\Support\Offices;
+use App\Support\PaymentReviews;
 use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -59,12 +60,16 @@ class HandleInertiaRequests extends Middleware
             'branding' => fn () => Settings::branding(),
             'popup' => fn () => Settings::publicPopup(),
             'verseToast' => fn () => Settings::publicVerseToast(),
+            'pendingReceipts' => fn () => $request->user()?->isAdmin() && $request->user()->canDo('approve_payments')
+                ? PaymentReviews::count($request->user())
+                : 0,
             'whatsappTemplates' => fn () => $request->user()?->isAdmin() ? Settings::whatsapp() : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'temp_password' => fn () => $request->session()->get('temp_password'),
             ],
             'departmentContext' => fn () => $this->departmentContext($request),
+            'singleDepartment' => fn () => Department::single()?->only(['name', 'slug']),
         ];
     }
 
@@ -82,11 +87,12 @@ class HandleInertiaRequests extends Middleware
         }
 
         $currentId = CurrentDepartment::idFor($user);
+        $single = Department::single();
 
         return [
             'current_id' => $currentId,
-            'current_name' => $currentId ? Department::find($currentId)?->name : null,
-            'options' => $user->hasRole('super_admin')
+            'current_name' => Department::find($currentId ?? $single?->id)?->name,
+            'options' => $user->hasRole('super_admin') && ! ($single && in_array($currentId, [null, $single->id]))
                 ? Department::orderBy('name')->get(['id', 'name'])
                 : null,
         ];

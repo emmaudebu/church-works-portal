@@ -1,6 +1,8 @@
 import Avatar from '@/Components/Avatar';
+import MemberProfileCard from '@/Components/Site/MemberProfileCard';
+import { SocialNetwork } from '@/Components/Site/SocialIcon';
 import { prefersReducedMotion } from '@/lib/motion';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, GalleryHorizontal, LayoutGrid } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 export type TeamMember = {
@@ -8,13 +10,22 @@ export type TeamMember = {
     full_name: string;
     unit: string | null;
     photo_url: string | null;
+    socials: { network: SocialNetwork; url: string }[];
 };
 
 const ADVANCE_MS = 3500;
 
-export default function MemberCarousel({ members }: { members: TeamMember[] }) {
+export default function MemberCarousel({
+    members,
+    department,
+}: {
+    members: TeamMember[];
+    department: string;
+}) {
     const track = useRef<HTMLUListElement>(null);
     const [paused, setPaused] = useState(false);
+    const [selected, setSelected] = useState<TeamMember | null>(null);
+    const [showGrid, setShowGrid] = useState(false);
 
     const move = (direction: 1 | -1) => {
         const element = track.current;
@@ -38,7 +49,7 @@ export default function MemberCarousel({ members }: { members: TeamMember[] }) {
     };
 
     useEffect(() => {
-        if (paused || prefersReducedMotion()) {
+        if (paused || selected || showGrid || prefersReducedMotion()) {
             return;
         }
 
@@ -49,30 +60,71 @@ export default function MemberCarousel({ members }: { members: TeamMember[] }) {
         }, ADVANCE_MS);
 
         return () => clearInterval(timer);
-    }, [paused]);
+    }, [paused, selected, showGrid]);
 
     return (
         <div
             role="group"
-            aria-roledescription="carousel"
+            aria-roledescription={showGrid ? undefined : 'carousel'}
             aria-label="Department members"
             onMouseEnter={() => setPaused(true)}
             onMouseLeave={() => setPaused(false)}
             onFocus={() => setPaused(true)}
             onBlur={() => setPaused(false)}
         >
+            <div className="mb-4 flex justify-end">
+                <button
+                    type="button"
+                    onClick={() => setShowGrid(!showGrid)}
+                    className="inline-flex items-center gap-2 rounded-full border border-primary-700 px-4 py-2 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                >
+                    {showGrid ? (
+                        <GalleryHorizontal
+                            size={16}
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                        />
+                    ) : (
+                        <LayoutGrid
+                            size={16}
+                            strokeWidth={1.75}
+                            aria-hidden="true"
+                        />
+                    )}
+                    {showGrid ? 'View as carousel' : 'View all as grid'}
+                </button>
+            </div>
+
             <ul
                 ref={track}
-                tabIndex={0}
-                aria-label="Members list. Use the arrow buttons or scroll."
-                className="flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-4 [-ms-overflow-style:none] [scrollbar-width:none] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 [&::-webkit-scrollbar]:hidden"
+                tabIndex={showGrid ? undefined : 0}
+                aria-label={
+                    showGrid
+                        ? 'Members list'
+                        : 'Members list. Use the arrow buttons or scroll.'
+                }
+                className={
+                    showGrid
+                        ? 'grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-4 xl:grid-cols-5'
+                        : 'flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth pb-4 [-ms-overflow-style:none] [scrollbar-width:none] focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 [&::-webkit-scrollbar]:hidden'
+                }
             >
                 {members.map((member) => (
                     <li
                         key={member.id}
-                        className="group w-44 shrink-0 snap-start sm:w-52"
+                        className={
+                            showGrid
+                                ? 'group min-w-0'
+                                : 'group w-44 shrink-0 snap-start sm:w-52'
+                        }
                     >
-                        <div className="card h-full p-5 text-center transition duration-300 group-hover:-translate-y-1">
+                        <button
+                            type="button"
+                            aria-haspopup="dialog"
+                            aria-label={`View ${member.full_name}'s profile`}
+                            onClick={() => setSelected(member)}
+                            className="card h-full w-full p-5 text-center transition duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 group-hover:-translate-y-1"
+                        >
                             <Avatar
                                 name={member.full_name}
                                 src={member.photo_url}
@@ -86,12 +138,16 @@ export default function MemberCarousel({ members }: { members: TeamMember[] }) {
                                     {member.unit}
                                 </p>
                             )}
-                        </div>
+                            <p className="mt-2 text-xs font-medium text-neutral-600 transition group-hover:text-primary-700">
+                                View profile
+                            </p>
+                        </button>
                     </li>
                 ))}
             </ul>
 
-            <div className="mt-2 flex justify-center gap-2">
+            {!showGrid && (
+                <div className="mt-2 flex justify-center gap-2">
                 <button
                     type="button"
                     aria-label="Previous members"
@@ -108,7 +164,16 @@ export default function MemberCarousel({ members }: { members: TeamMember[] }) {
                 >
                     <ArrowRight size={20} strokeWidth={1.75} />
                 </button>
-            </div>
+                </div>
+            )}
+
+            {selected && (
+                <MemberProfileCard
+                    member={selected}
+                    department={department}
+                    onClose={() => setSelected(null)}
+                />
+            )}
         </div>
     );
 }

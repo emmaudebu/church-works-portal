@@ -28,14 +28,15 @@ class Offices
         'manage_elections' => 'Run elections',
         'view_payments' => 'View payments',
         'manage_payments' => 'Create dues and levies',
-        'record_payments' => 'Record cash and check receipts',
+        'record_payments' => 'Record cash payments',
+        'approve_payments' => 'Approve proofs of payment',
         'manage_department' => 'Manage units and gallery',
     ];
 
     public const DEFAULTS = [
         'secretary' => ['manage_members', 'take_attendance', 'manage_services', 'view_reports', 'manage_posts'],
         'treasurer' => ['view_payments', 'manage_payments', 'record_payments', 'view_reports'],
-        'financial_secretary' => ['view_payments', 'record_payments'],
+        'financial_secretary' => ['view_payments', 'record_payments', 'approve_payments'],
         'welfare_officer' => ['view_reports', 'manage_posts'],
     ];
 

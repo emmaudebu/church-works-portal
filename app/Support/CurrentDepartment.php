@@ -23,4 +23,13 @@ class CurrentDepartment
 
         return $id && Department::whereKey($id)->exists() ? (int) $id : null;
     }
+
+    /**
+     * The department new records go into. With one active department a super
+     * admin has nothing to choose, so it is used without asking.
+     */
+    public static function forNewRecords(User $user): ?int
+    {
+        return self::idFor($user) ?? Department::single()?->id;
+    }
 }

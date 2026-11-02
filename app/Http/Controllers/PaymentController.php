@@ -6,6 +6,7 @@ use App\Models\Due;
 use App\Models\Payment;
 use App\Models\User;
 use App\Support\Dues;
+use App\Support\PaymentReviews;
 use App\Support\Paystack;
 use App\Support\PrivateDocument;
 use Illuminate\Http\RedirectResponse;
@@ -33,6 +34,7 @@ class PaymentController extends Controller
         return Inertia::render('Member/Payments', [
             'owing' => Dues::owing($user),
             'payable' => Dues::payable($user),
+            'waiting' => PaymentReviews::rows($user->payments()->where('status', 'under_review')->oldest()->get()),
             'history' => $user->payments()->where('status', 'success')->latest('paid_at')->limit(50)->get()->map->toRow(),
             'canPayOnline' => Paystack::isConfigured(),
             'bankAccount' => $user->department?->hasBankAccount() ? $user->department->bankAccount() : null,
@@ -88,7 +90,7 @@ class PaymentController extends Controller
             ...$this->choiceRules(),
             'receipt' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,webp', 'max:8192'],
         ], [
-            'receipt.required' => 'Please upload your payment receipt.',
+            'receipt.required' => 'Please upload your proof of payment.',
             'receipt.mimes' => 'Upload a PDF or a photo (JPG, PNG or WebP).',
         ]);
 
@@ -104,13 +106,15 @@ class PaymentController extends Controller
             return back()->withErrors(['payment' => 'Your department has no bank account set up yet.']);
         }
 
-        $this->createPayments($user, $due, $periods, 'TRF-'.Str::upper(Str::random(16)), [
+        $payments = $this->createPayments($user, $due, $periods, 'TRF-'.Str::upper(Str::random(16)), [
             'status' => 'under_review',
             'method' => 'transfer',
             'receipt' => PrivateDocument::store($request->file('receipt'), 'receipts'),
         ]);
 
-        return back()->with('success', 'Receipt received. An admin will confirm your payment.');
+        PaymentReviews::notifyApprovers($payments);
+
+        return back()->with('success', 'Proof of payment received. It will be recorded once it is approved.');
     }
 
     /**

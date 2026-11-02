@@ -8,8 +8,11 @@ use App\Models\Department;
 use App\Models\Service;
 use App\Models\User;
 use App\Support\AttendanceStats;
+use App\Support\BestMembers;
 use App\Support\CheckIn;
 use App\Support\CurrentDepartment;
+use App\Support\PaymentReviews;
+use App\Support\Settings;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -57,6 +60,9 @@ class DashboardController extends Controller
                     'service' => $row->service->title,
                     'checked_in_at' => $row->checked_in_at->format('j M, g:i A'),
                 ]),
+            'reviews' => $admin->canDo('approve_payments') ? PaymentReviews::list($admin) : [],
+            'bestMembers' => BestMembers::forDepartments($departments)->map->toCard(),
+            'bestMemberCriteria' => $admin->hasRole('super_admin') ? Settings::bestMember() : null,
         ]);
     }
 }

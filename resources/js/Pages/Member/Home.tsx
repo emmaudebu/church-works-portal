@@ -1,4 +1,5 @@
 import Avatar from '@/Components/Avatar';
+import BestMemberCard, { BestMember } from '@/Components/BestMemberCard';
 import PostCard from '@/Components/PostCard';
 import { naira } from '@/lib/money';
 import MemberLayout from '@/Layouts/MemberLayout';
@@ -97,6 +98,7 @@ export default function Home({
     upcoming,
     recentCheckIns,
     month,
+    bestMember,
     nextService,
     dues,
     openElection,
@@ -104,6 +106,7 @@ export default function Home({
     events,
 }: {
     profile: { member_id: string | null; percent: number; missing: string[] };
+    bestMember: BestMember | null;
     upcoming: {
         id: number;
         title: string;
@@ -149,6 +152,13 @@ export default function Home({
                             </p>
                         </div>
                     </section>
+
+                    {bestMember && (
+                        <BestMemberCard
+                            winner={bestMember}
+                            isYou={bestMember.user_id === user.id}
+                        />
+                    )}
 
                     {dues.count > 0 && (
                         <Link

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\BestMemberController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentContentController;
 use App\Http\Controllers\Admin\DepartmentController;
@@ -26,6 +27,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [SiteController::class, 'home'])->name('home');
 Route::get('/departments', [SiteController::class, 'departments'])->name('departments');
+Route::redirect('/departments/technical-unit', '/departments/technical-department', 301);
 Route::get('/departments/{department:slug}', [SiteController::class, 'department'])->name('departments.show');
 Route::get('/team/{user}/photo', [PhotoController::class, 'team'])->name('team.photo');
 Route::get('/news', [SiteController::class, 'news'])->name('news');
@@ -68,6 +70,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/gallery/{image}', [DepartmentContentController::class, 'updateImage'])->name('gallery.update')->middleware('office:manage_department');
         Route::delete('/gallery/{image}', [DepartmentContentController::class, 'destroyImage'])->name('gallery.destroy')->middleware('office:manage_department');
 
+        Route::patch('/departments/{department}/bank', [DepartmentController::class, 'updateBank'])->name('departments.bank');
+        Route::post('/departments/{department}/admins', [DepartmentController::class, 'assignAdmin'])->name('departments.admins.store');
+        Route::delete('/departments/{department}/admins/{user}', [DepartmentController::class, 'removeAdmin'])->name('departments.admins.destroy');
+
         Route::get('/members', [MemberController::class, 'index'])->name('members');
         Route::get('/members/export', [MemberController::class, 'export'])->name('members.export');
         Route::post('/members/approve', [MemberStatusController::class, 'approve'])->name('members.approve');
@@ -96,8 +102,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/reports/export/{format}', [ReportController::class, 'export'])->name('reports.export')->middleware('office:view_reports');
 
         Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments')->middleware('office:view_payments');
-        Route::post('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve')->middleware('office:record_payments');
-        Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject')->middleware('office:record_payments');
+        Route::post('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve')->middleware('office:approve_payments');
+        Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject')->middleware('office:approve_payments');
         Route::post('/dues', [AdminPaymentController::class, 'store'])->name('dues.store')->middleware('office:manage_payments');
         Route::post('/dues/{due}/toggle', [AdminPaymentController::class, 'toggle'])->name('dues.toggle')->middleware('office:manage_payments');
         Route::delete('/dues/{due}', [AdminPaymentController::class, 'destroy'])->name('dues.destroy')->middleware('office:manage_payments');
@@ -128,10 +134,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
             Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
             Route::patch('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
-            Route::patch('/departments/{department}/bank', [DepartmentController::class, 'updateBank'])->name('departments.bank');
-            Route::post('/departments/{department}/admins', [DepartmentController::class, 'assignAdmin'])->name('departments.admins.store');
-            Route::delete('/departments/{department}/admins/{user}', [DepartmentController::class, 'removeAdmin'])->name('departments.admins.destroy');
             Route::post('/current-department', [DepartmentController::class, 'switch'])->name('current-department');
+
+            Route::put('/best-member', [BestMemberController::class, 'update'])->name('best-member.update');
+            Route::post('/best-member/recalculate', [BestMemberController::class, 'recalculate'])->name('best-member.recalculate');
 
             Route::get('/settings', [SettingsController::class, 'index'])->name('settings');
             Route::post('/settings/branding', [SettingsController::class, 'updateBranding'])->name('settings.branding');

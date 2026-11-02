@@ -23,8 +23,10 @@ class RoleSeeder extends Seeder
         foreach (['super_admin', 'member', ...Offices::roles()] as $name) {
             $role = Role::findOrCreate($name, 'web');
 
-            if ($name === Offices::HEAD || $name === 'vice_head' && $role->permissions()->doesntExist()) {
+            if ($name === Offices::HEAD) {
                 $role->syncPermissions(Offices::permissions());
+            } elseif ($name === 'vice_head' && $role->permissions()->doesntExist()) {
+                $role->syncPermissions(array_diff(Offices::permissions(), ['approve_payments']));
             } elseif (isset(Offices::DEFAULTS[$name]) && $role->permissions()->doesntExist()) {
                 $role->syncPermissions(Offices::DEFAULTS[$name]);
             }

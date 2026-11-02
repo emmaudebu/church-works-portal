@@ -99,6 +99,23 @@ class MemberRules
     }
 
     /**
+     * @return array<string, array<int, string>>
+     */
+    public static function socials(): array
+    {
+        $rules = [
+            'socials' => ['nullable', 'array'],
+            'socials.whatsapp' => ['nullable', 'string', self::PHONE_FORMAT],
+        ];
+
+        foreach (array_keys(Socials::NETWORKS) as $network) {
+            $rules["socials.$network"] = ['nullable', 'string', 'max:255', 'regex:'.Socials::linkFormat($network)];
+        }
+
+        return $rules;
+    }
+
+    /**
      * @return array<int, string>
      */
     public static function photo(): array

@@ -1,5 +1,8 @@
 import AttendanceChart from '@/Components/AttendanceChart';
 import Avatar from '@/Components/Avatar';
+import BestMemberCard, { BestMember } from '@/Components/BestMemberCard';
+import BestMemberCriteria, { Criteria } from '@/Components/BestMemberCriteria';
+import ReceiptReviews, { Review } from '@/Components/Payments/ReceiptReviews';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { CheckedInMember, PageProps, TrendPoint } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -57,6 +60,9 @@ export default function Dashboard({
     trend,
     absentees,
     recent,
+    reviews,
+    bestMembers,
+    bestMemberCriteria,
 }: {
     stats: {
         total: number;
@@ -73,19 +79,23 @@ export default function Dashboard({
         missed: number;
     }[];
     recent: CheckedInMember[];
+    reviews: Review[];
+    bestMembers: BestMember[];
+    bestMemberCriteria: Criteria | null;
 }) {
-    const { permissions } = usePage<PageProps>().props.auth.user;
+    const { office, permissions } = usePage<PageProps>().props.auth.user;
+    const heading = office ? `Welcome, ${office}` : 'Admin Dashboard';
 
     const members = (status?: string) =>
         route('admin.members', status ? { status } : {});
 
     return (
         <AdminLayout>
-            <Head title="Admin Dashboard" />
+            <Head title={heading} />
 
             <div className="flex flex-wrap items-end justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl">Admin Dashboard</h1>
+                    <h1 className="text-3xl">{heading}</h1>
                     <div className="gold-rule" />
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -121,6 +131,12 @@ export default function Dashboard({
                 </div>
             </div>
 
+            {reviews.length > 0 && (
+                <div className="mt-6">
+                    <ReceiptReviews reviews={reviews} />
+                </div>
+            )}
+
             <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                 <StatCard
                     label="Total members"
@@ -153,6 +169,21 @@ export default function Dashboard({
                     href={members('pending')}
                 />
             </div>
+
+            {bestMembers.length > 0 && (
+                <div className="mt-6">
+                    <Panel title="Best members">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {bestMembers.map((winner) => (
+                                <BestMemberCard
+                                    key={winner.id}
+                                    winner={winner}
+                                />
+                            ))}
+                        </div>
+                    </Panel>
+                </div>
+            )}
 
             <div className="mt-6 grid gap-6 xl:grid-cols-3">
                 <div className="xl:col-span-2">
@@ -229,6 +260,12 @@ export default function Dashboard({
                     </Panel>
                 </div>
             </div>
+
+            {bestMemberCriteria && (
+                <div className="mt-6">
+                    <BestMemberCriteria criteria={bestMemberCriteria} />
+                </div>
+            )}
         </AdminLayout>
     );
 }

@@ -1,11 +1,15 @@
 import DepartmentCard from '@/Components/DepartmentCard';
 import EmptyState from '@/Components/EmptyState';
 import PostCard from '@/Components/PostCard';
+import BestMemberSpotlight, {
+    Spotlight,
+} from '@/Components/Site/BestMemberSpotlight';
 import Countdown from '@/Components/Site/Countdown';
 import CountUp from '@/Components/Site/CountUp';
 import FloatingShapes from '@/Components/Site/FloatingShapes';
 import HeroSlider from '@/Components/Site/HeroSlider';
 import SectionHeading from '@/Components/Site/SectionHeading';
+import UnitGrid from '@/Components/Site/UnitGrid';
 import PublicLayout from '@/Layouts/PublicLayout';
 import {
     Department,
@@ -22,24 +26,6 @@ type NextService = {
     time: string;
     opens_at: string;
 };
-
-const STEPS = [
-    {
-        image: '/images/site/gathering.jpg',
-        title: 'Register and get approved',
-        text: 'Share your details and photo. An admin in your department confirms them.',
-    },
-    {
-        image: '/images/site/auditorium.jpg',
-        title: 'Check in with your QR code',
-        text: 'Show your personal code at every service. Your attendance is kept for you.',
-    },
-    {
-        image: '/images/site/praise.jpg',
-        title: 'Stay part of the work',
-        text: 'Follow news and events, read announcements and vote in your department.',
-    },
-];
 
 function ArrowLink({ href, label }: { href: string; label: string }) {
     const external = href.startsWith('http');
@@ -111,6 +97,8 @@ function SpotlightCard({ post, label }: { post: PostCardData; label: string }) {
 
 export default function Welcome({
     home,
+    units,
+    bestMember,
     departments,
     posts,
     nextService,
@@ -120,15 +108,23 @@ export default function Welcome({
     stats,
 }: {
     home: HomeContent;
+    units: string[];
+    bestMember: Spotlight | null;
     departments: Department[];
     posts: PostCardData[];
     nextService: NextService | null;
     nextEvent: PostCardData | null;
     latestNews: PostCardData | null;
     serviceTimes: { key: string; title: string; day: string; time: string }[];
-    stats: { members: number; departments: number; services: number };
+    stats: {
+        members: number;
+        departments: number;
+        units: number;
+        services: number;
+    };
 }) {
-    const { user } = usePage<PageProps>().props.auth;
+    const { auth, singleDepartment } = usePage<PageProps>().props;
+    const { user } = auth;
 
     const topBar = nextService && (
         <div className="hidden border-b border-white/15 md:block">
@@ -241,7 +237,7 @@ export default function Welcome({
                             <CountUp value={stats.members} />
                         </span>
                         <span className="px-3 text-[10px] uppercase leading-tight tracking-wider">
-                            Workers serving
+                            Team members
                         </span>
                     </div>
                     <img
@@ -265,7 +261,9 @@ export default function Welcome({
                     <dl className="mt-8 grid grid-cols-3 divide-x divide-neutral-200 border-y border-neutral-200">
                         {[
                             [stats.members, 'Members'],
-                            [stats.departments, 'Departments'],
+                            singleDepartment
+                                ? [stats.units, 'Technical units']
+                                : [stats.departments, 'Departments'],
                             [stats.services, 'Services a week'],
                         ].map(([value, label]) => (
                             <div key={label} className="px-3 py-4 first:pl-0">
@@ -289,19 +287,42 @@ export default function Welcome({
                 </div>
             </section>
 
+            {singleDepartment && units.length > 0 && (
+                <section className="bg-charcoal-900 py-20 text-white">
+                    <div className="mx-auto max-w-7xl px-4 md:px-8">
+                        <div className="reveal mb-10 max-w-2xl">
+                            <p className="eyebrow text-gold-300">
+                                Behind every service
+                            </p>
+                            <h2 className="mt-2 text-4xl leading-tight text-white">
+                                Our{' '}
+                                <em className="font-medium text-gold-300">
+                                    Technical Units
+                                </em>
+                            </h2>
+                            <p className="mt-4 text-silver-300">
+                                Each unit has its own work. Together they keep
+                                every service heard, seen and running well.
+                            </p>
+                        </div>
+                        <UnitGrid units={units} />
+                    </div>
+                </section>
+            )}
+
             <section className="relative overflow-hidden bg-neutral-50 py-20">
                 <FloatingShapes />
                 <div className="relative mx-auto grid max-w-7xl gap-10 px-4 md:px-8 lg:grid-cols-[2fr_3fr]">
                     <div className="reveal">
-                        <p className="eyebrow">Join the workforce</p>
+                        <p className="eyebrow">{home.join.eyebrow}</p>
                         <h2 className="mt-2 text-4xl leading-tight">
-                            Your Place{' '}
+                            {home.join.title}{' '}
                             <em className="font-medium text-primary-700">
-                                In The Work
+                                {home.join.accent}
                             </em>
                         </h2>
                         <p className="mt-4 text-neutral-600">
-                            Three simple steps to start serving with us.
+                            {home.join.text}
                         </p>
 
                         {serviceTimes.length > 0 && (
@@ -327,9 +348,9 @@ export default function Welcome({
                     </div>
 
                     <ol className="space-y-5">
-                        {STEPS.map((step, index) => (
+                        {home.join.steps.map((step, index) => (
                             <li
-                                key={step.title}
+                                key={index}
                                 className="reveal group card flex flex-col overflow-hidden transition duration-300 hover:-translate-y-1 sm:flex-row"
                             >
                                 <div className="relative h-44 shrink-0 overflow-hidden bg-charcoal-900 sm:h-auto sm:w-2/5">
@@ -355,27 +376,31 @@ export default function Welcome({
                 </div>
             </section>
 
-            <section className="mx-auto max-w-7xl px-4 py-20 md:px-8">
-                <SectionHeading
-                    eyebrow="Serve with us"
-                    title="Our"
-                    accent="Departments"
-                    action={
-                        <ArrowLink
-                            href={route('departments')}
-                            label="All departments"
-                        />
-                    }
-                />
-                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                    {departments.map((department) => (
-                        <DepartmentCard
-                            key={department.id}
-                            department={department}
-                        />
-                    ))}
-                </div>
-            </section>
+            {bestMember && <BestMemberSpotlight winner={bestMember} />}
+
+            {!singleDepartment && (
+                <section className="mx-auto max-w-7xl px-4 py-20 md:px-8">
+                    <SectionHeading
+                        eyebrow="Serve with us"
+                        title="Our"
+                        accent="Departments"
+                        action={
+                            <ArrowLink
+                                href={route('departments')}
+                                label="All departments"
+                            />
+                        }
+                    />
+                    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                        {departments.map((department) => (
+                            <DepartmentCard
+                                key={department.id}
+                                department={department}
+                            />
+                        ))}
+                    </div>
+                </section>
+            )}
 
             <section className="bg-neutral-50 py-20">
                 <div className="mx-auto max-w-7xl px-4 md:px-8">

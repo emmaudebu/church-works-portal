@@ -6,9 +6,11 @@ use App\Models\Department;
 use App\Models\Post;
 use App\Models\Service;
 use App\Models\User;
+use App\Support\BestMembers;
 use App\Support\Offices;
 use App\Support\ServiceGenerator;
 use App\Support\Settings;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -25,8 +27,14 @@ class SiteController extends Controller
     {
         ServiceGenerator::generate();
 
+        $single = Department::single();
+
         return Inertia::render('Welcome', [
             'home' => Settings::presentHome(),
+            'units' => $single?->units->pluck('name') ?? [],
+            'bestMember' => $single
+                ? BestMembers::forDepartments(collect([$single->id]))->first()?->toPublicCard()
+                : null,
             'departments' => Department::forDisplay()->get()->map->toCard(),
             'posts' => Post::publicFacing()->latest('published_at')->limit(3)->get()->map->toCard(),
             'nextService' => $this->nextService(),
@@ -51,16 +59,23 @@ class SiteController extends Controller
                     ->whereDoesntHave('roles', fn ($roles) => $roles->where('name', 'super_admin'))
                     ->count(),
                 'departments' => Department::where('status', 'active')->count(),
+                'units' => $single?->units->count() ?? 0,
                 'services' => count(Settings::services()),
             ],
         ]);
     }
 
     /**
-     * List every department.
+     * List every department, or go straight to the only one.
      */
-    public function departments(): Response
+    public function departments(): Response|RedirectResponse
     {
+        $single = Department::single();
+
+        if ($single) {
+            return to_route('departments.show', $single->slug);
+        }
+
         return Inertia::render('Site/Departments', [
             'departments' => Department::forDisplay()->get()->map->toCard(),
         ]);
@@ -82,7 +97,8 @@ class SiteController extends Controller
             ->values();
 
         return Inertia::render('Site/Department', [
-            'department' => $department->toCard(),
+            'department' => [...$department->toCard(), 'image_url' => $department->bannerUrl()],
+            'bestMember' => BestMembers::forDepartments(collect([$department->id]))->first()?->toPublicCard(),
             'units' => $department->units->pluck('name'),
             'gallery' => $department->images->map->toCard(),
             'officers' => $officers->map(fn (User $user) => [
@@ -99,11 +115,14 @@ class SiteController extends Controller
                     'full_name' => $user->full_name,
                     'unit' => $user->unit,
                     'photo_url' => $user->publicPhotoUrl(),
+                    'socials' => $user->publicSocials(),
                 ]),
             'events' => (clone $posts)->where('type', 'event')->where('event_date', '>=', now())
                 ->orderBy('event_date')->limit(3)->get()->map->toCard(),
             'news' => (clone $posts)->where('type', 'news')->latest('published_at')->limit(3)->get()->map->toCard(),
-            'others' => Department::forDisplay()->whereKeyNot($department->id)->limit(3)->get()->map->toCard(),
+            'others' => Department::single()
+                ? []
+                : Department::forDisplay()->whereKeyNot($department->id)->limit(3)->get()->map->toCard(),
         ]);
     }
 

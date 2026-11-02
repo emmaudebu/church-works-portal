@@ -39,7 +39,7 @@ class ElectionController extends Controller
                     'department' => $election->department->name,
                     'window' => $election->starts_at->format('j M, g:i A').' to '.$election->ends_at->format('j M, g:i A'),
                 ]),
-            'canCreate' => CurrentDepartment::idFor($admin) !== null,
+            'canCreate' => CurrentDepartment::forNewRecords($admin) !== null,
         ]);
     }
 
@@ -48,7 +48,7 @@ class ElectionController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
-        $departmentId = CurrentDepartment::idFor($request->user());
+        $departmentId = CurrentDepartment::forNewRecords($request->user());
 
         abort_unless($departmentId, 422, 'Choose a department first.');
 

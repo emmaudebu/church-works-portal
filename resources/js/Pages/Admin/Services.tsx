@@ -25,6 +25,7 @@ type Service = {
     accepting: boolean;
     can_open: boolean;
     can_delete: boolean;
+    recurring: boolean;
 };
 
 const blank = { title: '', date: '', opens_at: '', closes_at: '' };
@@ -37,6 +38,7 @@ export default function Services({
     canCreate: boolean;
 }) {
     const [editing, setEditing] = useState<Service | 'new' | null>(null);
+    const [deleting, setDeleting] = useState<Service | null>(null);
     const form = useForm(blank);
 
     const openForm = (service: Service | 'new') => {
@@ -150,15 +152,7 @@ export default function Services({
                             {service.can_delete && (
                                 <DangerButton
                                     type="button"
-                                    onClick={() =>
-                                        router.delete(
-                                            route(
-                                                'admin.services.destroy',
-                                                service.id,
-                                            ),
-                                            { preserveScroll: true },
-                                        )
-                                    }
+                                    onClick={() => setDeleting(service)}
                                 >
                                     Delete
                                 </DangerButton>
@@ -169,6 +163,58 @@ export default function Services({
             </ul>
 
             <Pagination links={services.links} />
+
+            <Modal
+                show={deleting !== null}
+                onClose={() => setDeleting(null)}
+                maxWidth="md"
+            >
+                <div className="p-4 sm:p-6">
+                    <h2 className="text-xl">Delete this service?</h2>
+                    <p className="mt-1 text-sm font-medium">
+                        {deleting?.title}, {deleting?.date_label}
+                    </p>
+                    {!!deleting?.attendance_count && (
+                        <p className="mt-3 text-sm text-danger">
+                            {deleting.attendance_count}{' '}
+                            {deleting.attendance_count === 1
+                                ? 'attendance record'
+                                : 'attendance records'}{' '}
+                            will be permanently removed, and members' attendance
+                            rates will change. This can not be undone.
+                        </p>
+                    )}
+                    {deleting?.recurring && (
+                        <p className="mt-3 text-sm text-neutral-600">
+                            Only this date is deleted. Other weeks of this
+                            service are not affected.
+                        </p>
+                    )}
+                    <div className="mt-6 flex justify-end gap-3">
+                        <SecondaryButton onClick={() => setDeleting(null)}>
+                            Cancel
+                        </SecondaryButton>
+                        <DangerButton
+                            type="button"
+                            onClick={() =>
+                                deleting &&
+                                router.delete(
+                                    route(
+                                        'admin.services.destroy',
+                                        deleting.id,
+                                    ),
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () => setDeleting(null),
+                                    },
+                                )
+                            }
+                        >
+                            Delete service
+                        </DangerButton>
+                    </div>
+                </div>
+            </Modal>
 
             <Modal
                 show={editing !== null}

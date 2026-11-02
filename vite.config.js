@@ -40,8 +40,8 @@ export default defineConfig({
             },
             manifest: {
                 id: '/',
-                name: 'Covenant Workforce',
-                short_name: 'Covenant',
+                name: 'Covenant Technical Department',
+                short_name: 'Covenant Tech',
                 description: 'Members, attendance, events and elections in one place',
                 start_url: '/dashboard',
                 scope: '/',

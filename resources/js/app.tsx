@@ -8,7 +8,7 @@ import { listenForInstallPrompt } from './lib/install';
 
 const appName =
     document.querySelector<HTMLMetaElement>('meta[name="app-name"]')?.content ??
-    'Covenant Workforce';
+    'Covenant Technical Department';
 
 listenForInstallPrompt();
 

@@ -11,7 +11,7 @@ use Spatie\Permission\Models\Role;
 beforeEach(function () {
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
-    $this->department = Department::firstWhere('slug', 'technical-unit');
+    $this->department = Department::firstWhere('slug', 'technical-department');
     $this->choir = Department::firstWhere('slug', 'choir');
     $this->superAdmin = User::factory()->create()->assignRole('super_admin');
     $this->member = User::factory()->create(['department_id' => $this->department->id])->assignRole('member');
@@ -21,6 +21,75 @@ function officer(object $test, string $office): User
 {
     return User::factory()->create(['department_id' => $test->department->id])->assignRole($office);
 }
+
+test('a head can give their own members an office and take it away', function () {
+    $head = officer($this, 'dept_admin');
+    $member = officer($this, 'member');
+
+    $this->actingAs($head)->post(route('admin.departments.admins.store', $this->department), [
+        'user_id' => $member->id, 'office' => 'financial_secretary',
+    ])->assertSessionHasNoErrors();
+
+    expect($member->fresh()->hasRole('financial_secretary'))->toBeTrue()
+        ->and($member->fresh()->hasRole('member'))->toBeFalse();
+
+    $this->actingAs($head)->post(route('admin.departments.admins.store', $this->department), [
+        'user_id' => $member->id, 'office' => 'secretary',
+    ])->assertSessionHasNoErrors();
+
+    expect($member->fresh()->getRoleNames()->all())->toBe(['secretary']);
+
+    $this->actingAs($head)->delete(route('admin.departments.admins.destroy', [$this->department, $member]))->assertRedirect();
+
+    expect($member->fresh()->getRoleNames()->all())->toBe(['member']);
+});
+
+test('a head can not reach beyond their own department or above their office', function () {
+    $head = officer($this, 'dept_admin');
+    $member = officer($this, 'member');
+    $outsider = User::factory()->create(['department_id' => Department::factory()->create()->id])->assignRole('member');
+    $store = fn (array $data) => $this->actingAs($head)->post(route('admin.departments.admins.store', $this->department), $data);
+
+    $store(['user_id' => $member->id, 'office' => 'dept_admin'])->assertSessionHasErrors('office');
+    $store(['user_id' => $member->id])->assertSessionHasErrors('office');
+    $store(['user_id' => $outsider->id, 'office' => 'secretary'])->assertSessionHasErrors('user_id');
+    $store(['user_id' => $head->id, 'office' => 'secretary'])->assertForbidden();
+
+    $this->actingAs($head)->post(route('admin.departments.admins.store', $outsider->department_id), [
+        'user_id' => $outsider->id, 'office' => 'secretary',
+    ])->assertForbidden();
+
+    $this->actingAs($head)->delete(route('admin.departments.admins.destroy', [$this->department, $head]))->assertForbidden();
+
+    expect($member->fresh()->hasRole('member'))->toBeTrue()
+        ->and($outsider->fresh()->hasRole('member'))->toBeTrue()
+        ->and($head->fresh()->hasRole('dept_admin'))->toBeTrue();
+});
+
+test('only the head and super admin can give out offices', function (string $office) {
+    $officer = officer($this, $office);
+    $member = officer($this, 'member');
+
+    $this->actingAs($officer)->post(route('admin.departments.admins.store', $this->department), [
+        'user_id' => $member->id, 'office' => 'secretary',
+    ])->assertForbidden();
+
+    $this->actingAs($officer)->get(route('admin.departments.manage', $this->department))
+        ->assertInertia(fn (Assert $page) => $page->where('officeManager', null));
+})->with(['vice_head']);
+
+test('the head sees who they can appoint but not the head office', function () {
+    $head = officer($this, 'dept_admin');
+    $member = officer($this, 'member');
+
+    $this->actingAs($head)->get(route('admin.departments.manage', $this->department))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('officeManager.officers.0.removable', false)
+            ->where('officeManager.candidates', fn ($people) => collect($people)->pluck('id')->contains($member->id)
+                && ! collect($people)->pluck('id')->contains($head->id))
+            ->missing('officeManager.offices.dept_admin')
+            ->has('officeManager.offices.financial_secretary'));
+});
 
 test('all six offices exist with defaults', function () {
     expect(Role::whereIn('name', Offices::roles())->count())->toBe(6)
@@ -136,7 +205,7 @@ test('reseeding keeps permissions a super admin changed', function () {
 test('the browser is told what the person may do', function () {
     $this->actingAs(officer($this, 'financial_secretary'))->get('/admin')->assertInertia(fn (Assert $page) => $page
         ->where('auth.user.office', 'Financial Secretary')
-        ->where('auth.user.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['record_payments', 'view_payments']));
+        ->where('auth.user.permissions', fn ($permissions) => collect($permissions)->sort()->values()->all() === ['approve_payments', 'record_payments', 'view_payments']));
 });
 
 test('members stay out of every admin screen', function () {

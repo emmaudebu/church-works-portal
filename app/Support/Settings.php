@@ -13,6 +13,8 @@ class Settings
 {
     private const CACHE_KEY = 'settings';
 
+    public const DEFAULT_CHURCH_NAME = 'Covenant Technical Department';
+
     public const DEFAULT_COLORS = [
         'primary_900' => '#7A1210',
         'primary_700' => '#B81C19',
@@ -39,6 +41,15 @@ class Settings
         'transition' => 'zoom',
         'delay' => 2,
         'version' => 1,
+    ];
+
+    public const DEFAULT_BEST_MEMBER = [
+        'enabled' => true,
+        'attendance_weight' => 70,
+        'on_time_minutes' => 60,
+        'minimum_attendance' => 75,
+        'minimum_days' => 2,
+        'include_officers' => true,
     ];
 
     public const VERSE_POSITIONS = ['top-left', 'top-center', 'top-right', 'bottom-left', 'bottom-center', 'bottom-right', 'random'];
@@ -85,15 +96,15 @@ class Settings
                 'label' => 'Welcome',
                 'title' => 'Serving with',
                 'accent' => 'Excellence',
-                'text' => 'Members, attendance, events and elections in one place',
+                'text' => 'The people behind every sound, screen and light. Members, attendance, events and elections in one place.',
             ],
             [
                 'id' => 'gather',
                 'image' => '/images/site/congregation.jpg',
                 'label' => 'Gather',
-                'title' => 'Many Gifts,',
-                'accent' => 'One Workforce',
-                'text' => 'Every department, every unit and every worker, serving together.',
+                'title' => 'Many Skills,',
+                'accent' => 'One Team',
+                'text' => 'Sound, media, lighting, projection and every technical worker, serving together.',
             ],
             [
                 'id' => 'serve',
@@ -106,13 +117,36 @@ class Settings
         ],
         'welcome' => [
             'eyebrow' => 'Welcome home',
-            'title' => 'A Workforce That Serves In',
+            'title' => 'A Technical Team That Serves In',
             'accent' => 'Excellence',
-            'text' => 'Every service depends on willing hands. From the sound desk to the front door, each department plays its part so that people can worship without distraction.',
-            'button_label' => 'Explore departments',
+            'text' => 'Every service depends on willing hands behind the scenes. From the sound desk to the projection booth, each unit plays its part so that every word is heard, every service is seen and people can worship without distraction.',
+            'button_label' => 'Meet the department',
             'button_link' => '/departments',
             'image' => '/images/site/cross.jpg',
             'small_image' => '/images/site/surrender.jpg',
+        ],
+        'join' => [
+            'eyebrow' => 'Join the team',
+            'title' => 'Your Place',
+            'accent' => 'On The Team',
+            'text' => 'Three simple steps to start serving with us.',
+            'steps' => [
+                [
+                    'image' => '/images/site/gathering.jpg',
+                    'title' => 'Register and get approved',
+                    'text' => 'Share your details and photo. A department officer confirms them.',
+                ],
+                [
+                    'image' => '/images/site/auditorium.jpg',
+                    'title' => 'Check in with your QR code',
+                    'text' => 'Show your personal code at every service. Your attendance is kept for you.',
+                ],
+                [
+                    'image' => '/images/site/praise.jpg',
+                    'title' => 'Stay part of the work',
+                    'text' => 'Follow news and events, read announcements and vote in department elections.',
+                ],
+            ],
         ],
     ];
 
@@ -132,7 +166,7 @@ class Settings
 
     public static function churchName(): string
     {
-        return self::get('church_name', 'Covenant Workforce');
+        return self::get('church_name', self::DEFAULT_CHURCH_NAME);
     }
 
     /**
@@ -149,6 +183,16 @@ class Settings
     public static function whatsapp(): array
     {
         return [...self::DEFAULT_WHATSAPP, ...self::get('whatsapp', [])];
+    }
+
+    /**
+     * How the monthly best member is chosen.
+     *
+     * @return array<string, mixed>
+     */
+    public static function bestMember(): array
+    {
+        return [...self::DEFAULT_BEST_MEMBER, ...self::get('best_member', [])];
     }
 
     /**
@@ -242,7 +286,7 @@ class Settings
     }
 
     /**
-     * @return array{slides: array<int, array<string, string>>, welcome: array<string, string>}
+     * @return array{slides: array<int, array<string, string>>, welcome: array<string, string>, join: array<string, mixed>}
      */
     public static function home(): array
     {
@@ -267,6 +311,13 @@ class Settings
                 ...$home['welcome'],
                 'image' => self::imageUrl($home['welcome']['image']),
                 'small_image' => self::imageUrl($home['welcome']['small_image']),
+            ],
+            'join' => [
+                ...$home['join'],
+                'steps' => array_map(
+                    fn (array $step) => [...$step, 'image' => self::imageUrl($step['image'])],
+                    $home['join']['steps'],
+                ),
             ],
         ];
     }

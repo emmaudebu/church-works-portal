@@ -87,6 +87,15 @@ function playSound(context: AudioContext | null, status: Status) {
     }
 }
 
+function speak(text: string) {
+    if (!('speechSynthesis' in window)) {
+        return;
+    }
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+}
+
 export default function Scanner({
     service,
     count,
@@ -134,8 +143,12 @@ export default function Scanner({
             const { data } = await axios.post(url, body);
 
             show(data);
+
+            return data.status as Status;
         } catch {
             show({ status: 'error' });
+
+            return 'error';
         }
     };
 
@@ -151,13 +164,21 @@ export default function Scanner({
         busy.current = true;
         lastScan.current = { token, at: Date.now() };
 
-        await send(route('admin.scanner.check-in', service.id), { token });
+        const status = await send(route('admin.scanner.check-in', service.id), {
+            token,
+        });
+
+        if (status === 'present') {
+            speak(`Welcome to ${service.title}`);
+        }
 
         busy.current = false;
     };
 
     const start = async () => {
         audio.current ??= new AudioContext();
+        // Phones only allow speech once a tap has started it.
+        speak('');
         setCameraError(null);
 
         try {

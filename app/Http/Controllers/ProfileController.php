@@ -36,6 +36,7 @@ class ProfileController extends Controller
                 'certificate_urls' => Certificates::urls($request->user()),
                 'units' => $request->user()->department?->units->pluck('name') ?? [],
                 'show_on_site' => $request->user()->show_on_site,
+                'socials' => $request->user()->socials ?? [],
             ],
         ]);
     }

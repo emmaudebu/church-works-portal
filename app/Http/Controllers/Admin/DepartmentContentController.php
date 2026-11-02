@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Department;
 use App\Models\DepartmentImage;
 use App\Models\Unit;
+use App\Models\User;
+use App\Support\Offices;
 use App\Support\PostImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,14 +35,46 @@ class DepartmentContentController extends Controller
                 ...$department->only(['id', 'name', 'slug', 'description', 'about', 'bank_name', 'account_number', 'account_name']),
                 'image_url' => $department->imageUrl(),
             ],
-            'canEditBank' => $request->user()->hasRole('super_admin'),
+            'canEditBank' => $request->user()->leadsDepartment($department->id),
             'units' => $department->units->map(fn (Unit $unit) => [
                 'id' => $unit->id,
                 'name' => $unit->name,
                 'members' => (int) $counts->get($unit->name, 0),
             ]),
             'images' => $department->images->map->toCard(),
+            'officeManager' => $request->user()->leadsDepartment($department->id) ? $this->officeManager($request, $department) : null,
         ]);
+    }
+
+    /**
+     * What the Head or a super admin needs to give out offices.
+     *
+     * @return array<string, mixed>
+     */
+    private function officeManager(Request $request, Department $department): array
+    {
+        $isSuperAdmin = $request->user()->hasRole('super_admin');
+
+        $people = $department->users()
+            ->where('status', 'active')
+            ->with('roles:id,name')
+            ->orderBy('full_name')
+            ->get();
+
+        $locked = fn (User $user) => $user->hasRole('super_admin') || (! $isSuperAdmin && $user->hasRole(Offices::HEAD));
+
+        return [
+            'officers' => $people->filter->isOfficer()->values()->map(fn (User $user) => [
+                ...$user->only(['id', 'full_name']),
+                'office' => $user->office(),
+                'removable' => ! $locked($user),
+            ]),
+            'candidates' => $people->reject($locked)->values()->map(fn (User $user) => [
+                'id' => $user->id,
+                'full_name' => $user->office() ? "{$user->full_name} ({$user->office()})" : $user->full_name,
+            ]),
+            'offices' => $isSuperAdmin ? Offices::LABELS : collect(Offices::LABELS)->except(Offices::HEAD),
+        ];
     }
 
     /**

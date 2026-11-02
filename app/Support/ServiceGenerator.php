@@ -6,12 +6,26 @@ use App\Models\Department;
 use App\Models\Service;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Facades\Cache;
 
 class ServiceGenerator
 {
     /**
+     * Create the services once a day, on the first visit of the day.
+     */
+    public static function generateDaily(): void
+    {
+        $today = CarbonImmutable::today();
+
+        if (Cache::add('services_generated_'.$today->toDateString(), true, $today->endOfDay())) {
+            self::generate($today);
+        }
+    }
+
+    /**
      * Create the recurring services for every active department. Safe to run
-     * repeatedly because a service that already exists is left alone.
+     * repeatedly because a service that already exists is left alone, and one
+     * a super admin deleted stays deleted.
      */
     public static function generate(?CarbonImmutable $from = null, ?CarbonImmutable $to = null): void
     {
@@ -28,7 +42,7 @@ class ServiceGenerator
                         continue;
                     }
 
-                    Service::firstOrCreate(
+                    Service::withTrashed()->firstOrCreate(
                         ['department_id' => $departmentId, 'recurring_key' => $service['key'], 'date' => $day->toDateString()],
                         [
                             'type' => match ($service['day']) {

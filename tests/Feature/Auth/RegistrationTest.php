@@ -12,7 +12,7 @@ beforeEach(function () {
 
     Storage::fake('local');
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
 
     $this->registration = [
         'full_name' => 'Test User',
@@ -21,7 +21,7 @@ beforeEach(function () {
         'phone' => '+234 0801 234 5678',
         'email' => 'new.member@example.com',
         'address' => '12 Faith Avenue',
-        'department_id' => Department::firstWhere('slug', 'technical-unit')->id,
+        'department_id' => Department::firstWhere('slug', 'technical-department')->id,
         'unit' => 'Sound',
         'foundation_class_done' => true,
         'foundation_certificate' => UploadedFile::fake()->create('foundation.pdf', 100, 'application/pdf'),
@@ -60,7 +60,7 @@ test('a new member registers as pending with full bio data and is not logged in'
 
     [$width, $height] = getimagesizefromstring(Storage::disk('local')->get($user->photo));
 
-    expect([$width, $height])->toBe([600, 600]);
+    expect([$width, $height])->toBe([600, 750]);
 });
 
 test('each wizard step only validates its own fields', function () {
@@ -153,6 +153,19 @@ test('other file types are refused as certificates', function () {
         ...$this->registration,
         'foundation_certificate' => UploadedFile::fake()->create('cert.exe', 10, 'application/octet-stream'),
     ])->assertSessionHasErrors('foundation_certificate');
+});
+
+test('a certificate the server turned away asks for a smaller file', function () {
+    $turnedAway = new UploadedFile(__FILE__, 'wofbi.jpg', 'image/jpeg', UPLOAD_ERR_INI_SIZE, true);
+
+    $this->post('/register/check?step=2', [
+        'department_id' => $this->technical->id,
+        'unit' => 'Sound',
+        'wofbi_done' => true,
+        'wofbi_certificate' => $turnedAway,
+    ])->assertSessionHasErrors([
+        'wofbi_certificate' => 'That file could not be uploaded. Please use a smaller one, up to 8 MB.',
+    ]);
 });
 
 test('a file attached before changing the answer to no is not kept', function () {

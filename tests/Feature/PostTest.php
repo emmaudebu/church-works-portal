@@ -19,7 +19,7 @@ beforeEach(function () {
 
     Storage::fake('public');
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
     $this->choir = Department::firstWhere('slug', 'choir');
 
     $this->superAdmin = User::factory()->create()->assignRole('super_admin');

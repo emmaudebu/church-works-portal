@@ -4,6 +4,8 @@ use App\Models\Department;
 use App\Models\Due;
 use App\Models\Payment;
 use App\Models\User;
+use App\Notifications\PaymentDecided;
+use App\Notifications\PaymentSubmitted;
 use App\Support\Dues;
 use App\Support\Paystack;
 use App\Support\Settings;
@@ -13,6 +15,7 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -23,7 +26,7 @@ beforeEach(function () {
 
     $this->seed([RoleSeeder::class, DepartmentSeeder::class]);
 
-    $this->technical = Department::firstWhere('slug', 'technical-unit');
+    $this->technical = Department::firstWhere('slug', 'technical-department');
     $this->choir = Department::firstWhere('slug', 'choir');
 
     $this->superAdmin = User::factory()->create()->assignRole('super_admin');
@@ -338,7 +341,7 @@ test('leaving the secret key empty keeps the saved one', function () {
 
 function setBank(object $test): void
 {
-    $test->technical->update(['bank_name' => 'Zenith Bank', 'account_number' => '1234567890', 'account_name' => 'Technical Unit']);
+    $test->technical->update(['bank_name' => 'Zenith Bank', 'account_number' => '1234567890', 'account_name' => 'Technical Department']);
 }
 
 function submitTransfer(object $test, ?User $member = null, int $months = 1)
@@ -349,6 +352,89 @@ function submitTransfer(object $test, ?User $member = null, int $months = 1)
         'receipt' => UploadedFile::fake()->image('receipt.jpg', 2400, 1200),
     ]);
 }
+
+test('only the financial secretary and the head can approve a proof of payment', function () {
+    setBank($this);
+    submitTransfer($this);
+
+    $payment = Payment::where('status', 'under_review')->sole();
+    $officer = fn (string $office) => User::factory()->create(['department_id' => $this->technical->id])->assignRole($office);
+
+    $this->actingAs($officer('treasurer'))->post(route('admin.payments.approve', $payment))->assertForbidden();
+    $this->actingAs($officer('vice_head'))->post(route('admin.payments.approve', $payment))->assertForbidden();
+
+    $this->actingAs($officer('financial_secretary'))->post(route('admin.payments.approve', $payment))->assertRedirect();
+
+    expect($payment->fresh()->status)->toBe('success');
+
+    $this->actingAs($this->member)->get('/payments')->assertInertia(fn (Assert $page) => $page
+        ->has('history', 1)
+        ->has('waiting', 0));
+});
+
+test('a waiting proof shows on the approver dashboard and in the sidebar count', function () {
+    setBank($this);
+    submitTransfer($this, months: 3);
+
+    $secretary = User::factory()->create(['department_id' => $this->technical->id])->assignRole('financial_secretary');
+    $treasurer = User::factory()->create(['department_id' => $this->technical->id])->assignRole('treasurer');
+
+    $this->actingAs($secretary)->get('/admin')->assertInertia(fn (Assert $page) => $page
+        ->has('reviews', 1)
+        ->where('reviews.0.amount', 600000)
+        ->where('pendingReceipts', 1));
+
+    $this->actingAs($treasurer)->get('/admin')->assertInertia(fn (Assert $page) => $page
+        ->has('reviews', 0)
+        ->where('pendingReceipts', 0));
+
+    $this->actingAs($this->member)->get('/payments')->assertInertia(fn (Assert $page) => $page
+        ->has('waiting', 1)
+        ->where('waiting.0.amount', 600000));
+});
+
+test('a new proof notifies the financial secretary, or the head when there is none', function () {
+    Notification::fake();
+    setBank($this);
+
+    $subscribe = fn (User $user) => $user->updatePushSubscription('https://push.example/'.$user->id);
+
+    $subscribe($this->admin);
+
+    submitTransfer($this);
+
+    Notification::assertSentTo($this->admin, PaymentSubmitted::class);
+
+    $secretary = User::factory()->create(['department_id' => $this->technical->id])->assignRole('financial_secretary');
+    $subscribe($secretary);
+
+    Notification::fake();
+
+    submitTransfer($this, User::factory()->create(['department_id' => $this->technical->id])->assignRole('member'));
+
+    Notification::assertSentTo($secretary, PaymentSubmitted::class);
+    Notification::assertNotSentTo($this->admin, PaymentSubmitted::class);
+
+    Notification::fake();
+
+    submitTransfer($this, $secretary);
+
+    Notification::assertSentTo($this->admin, PaymentSubmitted::class);
+    Notification::assertNotSentTo($secretary, PaymentSubmitted::class);
+});
+
+test('the member hears the decision on their proof', function () {
+    Notification::fake();
+    setBank($this);
+
+    $this->member->updatePushSubscription('https://push.example/member');
+
+    submitTransfer($this);
+
+    $this->actingAs($this->admin)->post(route('admin.payments.approve', Payment::where('status', 'under_review')->sole()));
+
+    Notification::assertSentTo($this->member, PaymentDecided::class, fn (PaymentDecided $sent) => $sent->approved);
+});
 
 test('a member sees the bank account of their own department', function () {
     setBank($this);
@@ -491,18 +577,41 @@ test('the treasurer view lists receipts waiting', function () {
             ->where('report.paid_count', 0));
 });
 
-test('only a super admin can change the bank account, with their password', function () {
+test('the head and a super admin can change the bank account, with their password', function () {
     $data = ['bank_name' => 'GTBank', 'account_number' => '0123456789', 'account_name' => 'Tech', 'password' => 'password'];
+    $url = route('admin.departments.bank', $this->technical);
 
-    $this->actingAs($this->admin)->patch(route('admin.departments.bank', $this->technical), $data)->assertForbidden();
-    $this->actingAs($this->superAdmin)->patch(route('admin.departments.bank', $this->technical), [...$data, 'password' => 'wrong'])
-        ->assertSessionHasErrors('password');
+    $this->actingAs($this->admin)->patch($url, [...$data, 'password' => 'wrong'])->assertSessionHasErrors('password');
+    $this->actingAs($this->superAdmin)->patch($url, [...$data, 'password' => 'wrong'])->assertSessionHasErrors('password');
 
     expect($this->technical->fresh()->account_number)->toBeNull();
 
-    $this->actingAs($this->superAdmin)->patch(route('admin.departments.bank', $this->technical), $data)->assertSessionHasNoErrors();
+    $this->actingAs($this->admin)->patch($url, $data)->assertSessionHasNoErrors();
 
-    expect($this->technical->fresh()->hasBankAccount())->toBeTrue();
+    expect($this->technical->fresh()->account_number)->toBe('0123456789');
+
+    $this->actingAs($this->superAdmin)->patch($url, [...$data, 'account_number' => '9876543210'])->assertSessionHasNoErrors();
+
+    expect($this->technical->fresh()->account_number)->toBe('9876543210');
+
+    $this->actingAs($this->admin)->get(route('admin.departments.manage', $this->technical))
+        ->assertInertia(fn (Assert $page) => $page->where('canEditBank', true));
+});
+
+test('nobody else can change the bank account', function () {
+    $data = ['bank_name' => 'GTBank', 'account_number' => '0123456789', 'account_name' => 'Tech', 'password' => 'password'];
+
+    $vice = User::factory()->create(['department_id' => $this->technical->id])->assignRole('vice_head');
+    $otherHead = User::factory()->create(['department_id' => $this->choir->id])->assignRole('dept_admin');
+
+    $this->actingAs($vice)->patch(route('admin.departments.bank', $this->technical), $data)->assertForbidden();
+    $this->actingAs($otherHead)->patch(route('admin.departments.bank', $this->technical), $data)->assertForbidden();
+    $this->actingAs($this->member)->patch(route('admin.departments.bank', $this->technical), $data)->assertForbidden();
+
+    $this->actingAs($vice)->get(route('admin.departments.manage', $this->technical))
+        ->assertInertia(fn (Assert $page) => $page->where('canEditBank', false));
+
+    expect($this->technical->fresh()->account_number)->toBeNull();
 });
 
 test('a bank account must be complete with a numeric account number', function () {

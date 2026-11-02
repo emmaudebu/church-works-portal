@@ -3,17 +3,21 @@ import DangerButton from '@/Components/DangerButton';
 import DepartmentIcon from '@/Components/DepartmentIcon';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import Modal from '@/Components/Modal';
+import OfficersPanel, { Officer, Person } from '@/Components/OfficersPanel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
+import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Department } from '@/types';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { X } from 'lucide-react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
-type Person = { id: number; full_name: string };
-type Officer = Person & { office: string | null };
-type Row = Department & { users: Officer[]; deletable: boolean };
+type Row = Department & {
+    users: Officer[];
+    in_use: boolean;
+    people_count: number;
+};
 
 const fieldClass =
     'mt-1 block w-full rounded-lg border-neutral-200 text-sm focus:border-primary-700 focus:ring-primary-700';
@@ -45,6 +49,103 @@ function IconSelect({
     );
 }
 
+function DeleteDepartment({
+    department,
+    show,
+    onClose,
+}: {
+    department: Row;
+    show: boolean;
+    onClose: () => void;
+}) {
+    const form = useForm({ confirm_name: '' });
+
+    const close = () => {
+        form.reset();
+        form.clearErrors();
+        onClose();
+    };
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.delete(route('admin.departments.destroy', department.id), {
+            preserveScroll: true,
+            onSuccess: close,
+        });
+    };
+
+    return (
+        <Modal show={show} onClose={close} maxWidth="md">
+            <form onSubmit={submit} className="p-4 sm:p-6">
+                <h2 className="text-xl">Delete {department.name}?</h2>
+
+                {department.in_use ? (
+                    <>
+                        <p className="mt-3 text-sm text-danger">
+                            This can not be undone. Its services, attendance,
+                            elections, dues, posts, units and gallery will be
+                            permanently removed.
+                        </p>
+                        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-neutral-600">
+                            <li>
+                                {department.people_count}{' '}
+                                {department.people_count === 1
+                                    ? 'person keeps their account'
+                                    : 'people keep their accounts'}{' '}
+                                but will have no department until you move them.
+                            </li>
+                            <li>Officers go back to being regular members.</li>
+                            <li>Payment records are kept.</li>
+                            <li>
+                                Proofs of payment still waiting are marked as
+                                not accepted, so check them first.
+                            </li>
+                        </ul>
+                        <div className="mt-4">
+                            <InputLabel
+                                htmlFor={`confirm-${department.id}`}
+                                value={`Type "${department.name}" to confirm`}
+                            />
+                            <TextInput
+                                id={`confirm-${department.id}`}
+                                value={form.data.confirm_name}
+                                onChange={(e) =>
+                                    form.setData('confirm_name', e.target.value)
+                                }
+                                autoComplete="off"
+                                className="mt-1 block w-full"
+                            />
+                            <InputError
+                                message={form.errors.confirm_name}
+                                className="mt-2"
+                            />
+                        </div>
+                    </>
+                ) : (
+                    <p className="mt-2 text-sm text-neutral-600">
+                        This department has no members or attendance. This can
+                        not be undone.
+                    </p>
+                )}
+
+                <div className="mt-6 flex justify-end gap-3">
+                    <SecondaryButton onClick={close}>Cancel</SecondaryButton>
+                    <DangerButton
+                        disabled={
+                            form.processing ||
+                            (department.in_use &&
+                                form.data.confirm_name !== department.name)
+                        }
+                    >
+                        Delete department
+                    </DangerButton>
+                </div>
+            </form>
+        </Modal>
+    );
+}
+
 function DepartmentRow({
     department,
     candidates,
@@ -57,24 +158,30 @@ function DepartmentRow({
     offices: Record<string, string>;
 }) {
     const active = department.status === 'active';
-
-    const { data, setData, post, processing, errors, reset } = useForm({
-        user_id: '',
-        office: Object.keys(offices)[0],
-    });
+    const [deleting, setDeleting] = useState(false);
 
     const page = useForm<{
         name: string;
         icon: string;
         description: string;
         about: string;
+        about_label: string;
+        about_title: string;
+        about_accent: string;
         image: File | null;
+        about_image: File | null;
+        about_small_image: File | null;
     }>({
         name: department.name,
         icon: department.icon ?? 'building',
         description: department.description ?? '',
         about: department.about ?? '',
+        about_label: department.about_label ?? '',
+        about_title: department.about_title ?? '',
+        about_accent: department.about_accent ?? '',
         image: null,
+        about_image: null,
+        about_small_image: null,
     });
 
     const savePage: FormEventHandler = (e) => {
@@ -83,15 +190,6 @@ function DepartmentRow({
         page.post(route('admin.departments.page', department.id), {
             forceFormData: true,
             preserveScroll: true,
-        });
-    };
-
-    const assign: FormEventHandler = (e) => {
-        e.preventDefault();
-
-        post(route('admin.departments.admins.store', department.id), {
-            preserveScroll: true,
-            onSuccess: () => reset(),
         });
     };
 
@@ -148,7 +246,7 @@ function DepartmentRow({
                         className="h-16 w-28 rounded-lg object-cover"
                     />
                     <label className="min-w-0 flex-1 basis-48 text-sm font-medium">
-                        Change picture
+                        Change banner picture
                         <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
@@ -214,10 +312,90 @@ function DepartmentRow({
                         className="mt-2"
                     />
                 </div>
+                <h3 className="border-t border-neutral-200 pt-3 font-sans text-sm font-semibold">
+                    About us section
+                </h3>
+                <p className="text-sm text-neutral-600">
+                    Anything left empty keeps the standard wording, and your
+                    newest gallery pictures are used until you choose these.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    {(
+                        [
+                            [
+                                'about_image',
+                                'Main arched picture',
+                                department.about_image_url,
+                            ],
+                            [
+                                'about_small_image',
+                                'Small round picture',
+                                department.about_small_image_url,
+                            ],
+                        ] as const
+                    ).map(([field, label, current]) => (
+                        <div key={field}>
+                            <label className="block text-sm font-medium">
+                                {label}
+                                {current && (
+                                    <img
+                                        src={current}
+                                        alt=""
+                                        className="mt-1 h-28 w-full rounded-lg object-cover"
+                                    />
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp"
+                                    onChange={(e) =>
+                                        page.setData(
+                                            field,
+                                            e.target.files?.[0] ?? null,
+                                        )
+                                    }
+                                    className="mt-1 block w-full text-sm font-normal"
+                                />
+                            </label>
+                            <InputError
+                                message={page.errors[field]}
+                                className="mt-2"
+                            />
+                        </div>
+                    ))}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                    {(
+                        [
+                            ['about_label', 'Small label', 'About us'],
+                            ['about_title', 'Heading', 'What we'],
+                            ['about_accent', 'Red italic words', 'do'],
+                        ] as const
+                    ).map(([field, label, placeholder]) => (
+                        <div key={field}>
+                            <InputLabel
+                                htmlFor={`${field}-${department.id}`}
+                                value={label}
+                            />
+                            <input
+                                id={`${field}-${department.id}`}
+                                value={page.data[field]}
+                                placeholder={placeholder}
+                                onChange={(e) =>
+                                    page.setData(field, e.target.value)
+                                }
+                                className={fieldClass}
+                            />
+                            <InputError
+                                message={page.errors[field]}
+                                className="mt-2"
+                            />
+                        </div>
+                    ))}
+                </div>
                 <div>
                     <InputLabel
                         htmlFor={`about-${department.id}`}
-                        value="About this department"
+                        value="Paragraph"
                     />
                     <textarea
                         id={`about-${department.id}`}
@@ -238,116 +416,28 @@ function DepartmentRow({
                     Department officers
                 </h3>
 
-                {department.users.length === 0 ? (
-                    <p className="mt-1 text-sm text-neutral-600">
-                        No officers assigned yet.
-                    </p>
-                ) : (
-                    <ul className="mt-2 flex flex-wrap gap-2">
-                        {department.users.map((admin) => (
-                            <li
-                                key={admin.id}
-                                className="inline-flex items-center gap-1 rounded-full bg-primary-50 py-1 pl-3 pr-1 text-sm"
-                            >
-                                <span>
-                                    {admin.full_name}{' '}
-                                    <span className="text-xs text-neutral-600">
-                                        {admin.office}
-                                    </span>
-                                </span>
-                                <button
-                                    type="button"
-                                    aria-label={`Remove ${admin.full_name} from office`}
-                                    onClick={() =>
-                                        router.delete(
-                                            route(
-                                                'admin.departments.admins.destroy',
-                                                [department.id, admin.id],
-                                            ),
-                                            { preserveScroll: true },
-                                        )
-                                    }
-                                    className="rounded-full p-1 text-neutral-600 hover:text-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
-                                >
-                                    <X size={14} aria-hidden="true" />
-                                </button>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-
-                <form
-                    onSubmit={assign}
-                    className="mt-4 flex flex-wrap items-end gap-3"
-                >
-                    <div className="min-w-0 flex-1 basis-56">
-                        <InputLabel
-                            htmlFor={`admin-${department.id}`}
-                            value="Assign an officer"
-                        />
-                        <select
-                            id={`admin-${department.id}`}
-                            value={data.user_id}
-                            onChange={(e) =>
-                                setData('user_id', e.target.value)
-                            }
-                            className="mt-1 block w-full rounded-lg border-neutral-200 text-sm focus:border-primary-700 focus:ring-primary-700"
-                        >
-                            <option value="">Choose a member</option>
-                            {candidates.map((person) => (
-                                <option key={person.id} value={person.id}>
-                                    {person.full_name}
-                                </option>
-                            ))}
-                        </select>
-                        <InputError
-                            message={errors.user_id}
-                            className="mt-2"
-                        />
-                    </div>
-                    <div className="min-w-0 flex-1 basis-44">
-                        <InputLabel
-                            htmlFor={`office-${department.id}`}
-                            value="Office"
-                        />
-                        <select
-                            id={`office-${department.id}`}
-                            value={data.office}
-                            onChange={(e) => setData('office', e.target.value)}
-                            className={fieldClass}
-                        >
-                            {Object.entries(offices).map(([role, label]) => (
-                                <option key={role} value={role}>
-                                    {label}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-                    <PrimaryButton disabled={processing || !data.user_id}>
-                        Assign
-                    </PrimaryButton>
-                </form>
+                <OfficersPanel
+                    departmentId={department.id}
+                    officers={department.users}
+                    candidates={candidates}
+                    offices={offices}
+                />
             </div>
 
-            {department.deletable && (
-                <div className="mt-5 border-t border-neutral-200 pt-4">
-                    <DangerButton
-                        type="button"
-                        onClick={() => {
-                            if (window.confirm(`Delete ${department.name}?`)) {
-                                router.delete(
-                                    route(
-                                        'admin.departments.destroy',
-                                        department.id,
-                                    ),
-                                );
-                            }
-                        }}
-                    >
-                        Delete department
-                    </DangerButton>
-                </div>
-            )}
+            <div className="mt-5 border-t border-neutral-200 pt-4">
+                <DangerButton
+                    type="button"
+                    onClick={() => setDeleting(true)}
+                >
+                    Delete department
+                </DangerButton>
+            </div>
+
+            <DeleteDepartment
+                department={department}
+                show={deleting}
+                onClose={() => setDeleting(false)}
+            />
         </section>
     );
 }
