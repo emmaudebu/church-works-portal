@@ -32,6 +32,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // Paystack's server can't send a CSRF token; its signature is checked instead.
         $middleware->preventRequestForgery(except: ['paystack/webhook']);
 
+        // Tunnels and most hosts serve https in front of the app; trust them
+        // so links and secure cookies use https too.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'office' => EnsureOffice::class,
