@@ -50,6 +50,7 @@ class QrCodeController extends Controller
             'member' => [
                 ...$user->only(['full_name', 'member_id', 'unit']),
                 'department' => $user->department?->name,
+                'office' => $user->office() ?? 'Member',
                 'photo_url' => $user->photoUrl(),
                 'qr_url' => route('qr.show', $user),
             ],

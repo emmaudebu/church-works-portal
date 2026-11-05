@@ -13,7 +13,7 @@ export default function Badge({
 }: PropsWithChildren<{ variant: keyof typeof variants }>) {
     return (
         <span
-            className={`inline-flex shrink-0 items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${variants[variant]}`}
+            className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${variants[variant]}`}
         >
             {children}
         </span>

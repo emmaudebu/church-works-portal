@@ -69,7 +69,8 @@ test('the id card shows the member details', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('IdCard')
             ->where('member.full_name', $this->member->full_name)
-            ->where('member.department', 'Technical Department'));
+            ->where('member.department', 'Technical Department')
+            ->where('member.office', 'Member'));
 });
 
 test('a member can not open someone else id card', function () {

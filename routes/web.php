@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AttendanceLogController;
 use App\Http\Controllers\Admin\BestMemberController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentContentController;
@@ -100,6 +101,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports')->middleware('office:view_reports');
         Route::get('/reports/export/{format}', [ReportController::class, 'export'])->name('reports.export')->middleware('office:view_reports');
+        Route::get('/attendance-log', [AttendanceLogController::class, 'index'])->name('attendance-log')->middleware('office:view_reports');
+        Route::get('/attendance-log/{service}/export', [AttendanceLogController::class, 'export'])->name('attendance-log.export')->middleware('office:view_reports');
 
         Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments')->middleware('office:view_payments');
         Route::post('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve')->middleware('office:approve_payments');

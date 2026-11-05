@@ -12,6 +12,7 @@ import {
     CalendarClock,
     ChevronsLeft,
     ChevronsRight,
+    ClipboardList,
     LayoutDashboard,
     LucideIcon,
     Menu,
@@ -51,6 +52,12 @@ const navItems: {
         label: 'Reports',
         route: 'admin.reports',
         icon: BarChart3,
+        permission: 'view_reports',
+    },
+    {
+        label: 'Attendance Log',
+        route: 'admin.attendance-log',
+        icon: ClipboardList,
         permission: 'view_reports',
     },
     {

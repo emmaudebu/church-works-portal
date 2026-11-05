@@ -122,10 +122,17 @@
     }
 }
 
-/* ID cards print at the standard bank card size. */
+/* ID cards are portrait bank cards. Sizes inside use em, so the whole card
+   scales with its font size between the screen and the printed card. */
+.id-card {
+    width: 18rem;
+    height: calc(18rem * 85.6 / 53.98);
+    font-size: 12px;
+}
+
 @media print {
     @page {
-        size: 85.6mm 53.98mm;
+        size: 53.98mm 85.6mm;
         margin: 0;
     }
 
@@ -135,10 +142,12 @@
     }
 
     .id-card {
-        width: 85.6mm !important;
-        height: 53.98mm !important;
+        width: 53.98mm !important;
+        height: 85.6mm !important;
+        font-size: 8.5px;
         border-radius: 0 !important;
         box-shadow: none !important;
+        break-after: page;
         print-color-adjust: exact;
         -webkit-print-color-adjust: exact;
     }

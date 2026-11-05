@@ -8,7 +8,8 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
 
 type Service = {
@@ -37,6 +38,9 @@ export default function Services({
     services: { data: Service[]; links: PageLink[] };
     canCreate: boolean;
 }) {
+    const canViewLog = usePage<PageProps>().props.auth.user.permissions.includes(
+        'view_reports',
+    );
     const [editing, setEditing] = useState<Service | 'new' | null>(null);
     const [deleting, setDeleting] = useState<Service | null>(null);
     const form = useForm(blank);
@@ -124,6 +128,16 @@ export default function Services({
                             >
                                 Scanner
                             </Link>
+                            {canViewLog && service.attendance_count > 0 && (
+                                <Link
+                                    href={route('admin.attendance-log', {
+                                        service: service.id,
+                                    })}
+                                    className="inline-flex items-center rounded-lg border border-primary-700 bg-white px-4 py-2.5 text-sm font-semibold text-primary-700 transition hover:bg-primary-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                                >
+                                    Attendance log
+                                </Link>
+                            )}
                             {service.accepting ? (
                                 <SecondaryButton
                                     onClick={() =>
