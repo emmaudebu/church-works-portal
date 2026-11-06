@@ -41,6 +41,7 @@ export default function Department({
     bestMember,
     units,
     gallery,
+    galleryCount,
     officers,
     team,
     events,
@@ -51,6 +52,7 @@ export default function Department({
     bestMember: Spotlight | null;
     units: string[];
     gallery: GalleryImage[];
+    galleryCount: number;
     officers: Officer[];
     team: TeamMember[];
     events: PostCardData[];
@@ -264,6 +266,21 @@ export default function Department({
                     accent="Gallery"
                 />
                 <Gallery images={pictures} />
+                {galleryCount > 0 && (
+                    <div className="mt-8 text-center">
+                        <Link
+                            href={route('departments.gallery', department.slug)}
+                            className="group inline-flex items-center gap-2 rounded-full bg-primary-700 px-6 py-3 text-sm font-semibold text-white shadow-soft transition hover:-translate-y-0.5 hover:bg-primary-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-2"
+                        >
+                            View full gallery
+                            <ArrowRight
+                                size={20}
+                                strokeWidth={1.75}
+                                aria-hidden="true"
+                            />
+                        </Link>
+                    </div>
+                )}
             </section>
 
             {lastSection === 'events' && spotlight}

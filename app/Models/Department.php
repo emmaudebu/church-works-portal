@@ -50,9 +50,9 @@ class Department extends Model
      */
     public function bannerUrl(): string
     {
-        $galleryImage = $this->images->last();
+        $galleryImage = $this->image ? null : $this->images()->reorder()->oldest('id')->first();
 
-        return ! $this->image && $galleryImage
+        return $galleryImage
             ? $galleryImage->toCard()['url']
             : $this->imageUrl();
     }

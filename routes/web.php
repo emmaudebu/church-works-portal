@@ -17,6 +17,7 @@ use App\Http\Controllers\Admin\SettingsController;
 use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\CertificateController;
 use App\Http\Controllers\ElectionController;
+use App\Http\Controllers\GalleryUploadController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PhotoController;
 use App\Http\Controllers\PostController;
@@ -30,6 +31,7 @@ Route::get('/', [SiteController::class, 'home'])->name('home');
 Route::get('/departments', [SiteController::class, 'departments'])->name('departments');
 Route::redirect('/departments/technical-unit', '/departments/technical-department', 301);
 Route::get('/departments/{department:slug}', [SiteController::class, 'department'])->name('departments.show');
+Route::get('/departments/{department:slug}/gallery', [SiteController::class, 'gallery'])->name('departments.gallery');
 Route::get('/team/{user}/photo', [PhotoController::class, 'team'])->name('team.photo');
 Route::get('/news', [SiteController::class, 'news'])->name('news');
 Route::post('/paystack/webhook', [PaymentController::class, 'webhook'])->name('paystack.webhook');
@@ -59,6 +61,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/elections/{election}/results', [ElectionController::class, 'results'])->name('member.elections.results');
     Route::get('/candidates/{candidate}/photo', [ElectionController::class, 'photo'])->name('candidates.photo');
 
+    Route::get('/gallery/upload', [GalleryUploadController::class, 'index'])->name('gallery.upload');
+    Route::post('/gallery/upload', [GalleryUploadController::class, 'store'])->name('gallery.upload.store');
+    Route::delete('/gallery/upload/{image}', [GalleryUploadController::class, 'destroy'])->name('gallery.upload.destroy');
+
     Route::prefix('admin')->name('admin.')->middleware('office')->group(function () {
         Route::get('/', DashboardController::class)->name('dashboard');
 
@@ -69,6 +75,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/units/{unit}', [DepartmentContentController::class, 'destroyUnit'])->name('units.destroy')->middleware('office:manage_department');
         Route::post('/departments/{department}/gallery', [DepartmentContentController::class, 'storeImages'])->name('gallery.store')->middleware('office:manage_department');
         Route::patch('/gallery/{image}', [DepartmentContentController::class, 'updateImage'])->name('gallery.update')->middleware('office:manage_department');
+        Route::post('/departments/{department}/uploaders', [DepartmentContentController::class, 'storeUploader'])->name('gallery.uploaders.store');
+        Route::delete('/departments/{department}/uploaders/{user}', [DepartmentContentController::class, 'destroyUploader'])->name('gallery.uploaders.destroy');
+        Route::patch('/gallery/{image}/occasion', [DepartmentContentController::class, 'moveOccasion'])->name('gallery.occasion')->middleware('office:manage_department');
         Route::delete('/gallery/{image}', [DepartmentContentController::class, 'destroyImage'])->name('gallery.destroy')->middleware('office:manage_department');
 
         Route::patch('/departments/{department}/bank', [DepartmentController::class, 'updateBank'])->name('departments.bank');

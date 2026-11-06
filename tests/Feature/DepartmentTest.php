@@ -513,6 +513,8 @@ test('the gallery shows on the public page and pictures can be captioned and rem
 
     $this->actingAs($this->superAdmin)->post(route('admin.gallery.store', $this->technical), [
         'images' => [UploadedFile::fake()->image('a.jpg', 2000, 1000), UploadedFile::fake()->image('b.png')],
+        'event_name' => 'Outreach',
+        'event_date' => today()->toDateString(),
     ])->assertSessionHasNoErrors();
 
     $image = $this->technical->images()->firstOrFail();

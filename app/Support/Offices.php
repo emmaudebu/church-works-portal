@@ -31,6 +31,7 @@ class Offices
         'record_payments' => 'Record cash payments',
         'approve_payments' => 'Approve proofs of payment',
         'manage_department' => 'Manage units and gallery',
+        'upload_gallery' => 'Upload gallery pictures',
     ];
 
     public const DEFAULTS = [

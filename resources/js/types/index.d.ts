@@ -81,6 +81,14 @@ export interface GalleryImage {
     url: string;
 }
 
+/** The service or event a group of gallery pictures was taken at. */
+export interface GalleryOccasion {
+    key: string;
+    title: string;
+    date_label: string | null;
+    is_service: boolean;
+}
+
 export interface VerseToastData {
     enabled: boolean;
     position: string;

@@ -13,6 +13,7 @@ import {
     ChevronsLeft,
     ChevronsRight,
     ClipboardList,
+    ImagePlus,
     LayoutDashboard,
     LucideIcon,
     Menu,
@@ -77,6 +78,12 @@ const navItems: {
         route: 'admin.elections',
         icon: Vote,
         permission: 'manage_elections',
+    },
+    {
+        label: 'Upload Gallery',
+        route: 'gallery.upload',
+        icon: ImagePlus,
+        permission: 'upload_gallery',
     },
     {
         label: 'Departments',

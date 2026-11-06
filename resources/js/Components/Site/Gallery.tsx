@@ -1,9 +1,31 @@
 import { GalleryImage } from '@/types';
 import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-export default function Gallery({ images }: { images: GalleryImage[] }) {
+/** Names the saved file after its caption, keeping the picture's own type. */
+function downloadName(image: GalleryImage): string {
+    const extension = image.url.split('?')[0].split('.').pop() ?? 'jpg';
+    const name =
+        image.caption
+            ?.toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '') || `photo-${Math.abs(image.id)}`;
+
+    return `${name}.${extension}`;
+}
+
+/**
+ * A grid of pictures that open full screen. Pass `reveal={false}` when the
+ * grid appears after the page loads, which the scroll fade-in would miss.
+ */
+export default function Gallery({
+    images,
+    reveal = true,
+}: {
+    images: GalleryImage[];
+    reveal?: boolean;
+}) {
     const [open, setOpen] = useState<number | null>(null);
 
     const move = (by: number) =>
@@ -41,7 +63,10 @@ export default function Gallery({ images }: { images: GalleryImage[] }) {
         <>
             <ul className="columns-2 gap-4 md:columns-3 lg:columns-4">
                 {images.map((image, index) => (
-                    <li key={image.id} className="reveal mb-4 break-inside-avoid">
+                    <li
+                        key={image.id}
+                        className={`${reveal ? 'reveal ' : ''}mb-4 break-inside-avoid`}
+                    >
                         <button
                             type="button"
                             onClick={() => setOpen(index)}
@@ -111,6 +136,20 @@ export default function Gallery({ images }: { images: GalleryImage[] }) {
                                 >
                                     <ChevronRight size={20} strokeWidth={1.75} />
                                 </button>
+                            )}
+                            {shown && (
+                                <a
+                                    href={shown.url}
+                                    download={downloadName(shown)}
+                                    className="inline-flex items-center gap-2 rounded-full border border-white/40 py-2 pl-3 pr-4 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
+                                >
+                                    <Download
+                                        size={20}
+                                        strokeWidth={1.75}
+                                        aria-hidden="true"
+                                    />
+                                    Download
+                                </a>
                             )}
                         </div>
                     </DialogPanel>
