@@ -17,5 +17,7 @@ Artisan::command('services:generate', function () {
 
 Schedule::command('services:generate')->daily();
 
+Schedule::command('media:prune')->dailyAt('03:00');
+
 // Sends queued push notifications on hosts that can't keep a worker running.
 Schedule::command('queue:work --stop-when-empty --max-time=50')->everyMinute()->withoutOverlapping();

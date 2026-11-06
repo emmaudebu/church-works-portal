@@ -130,10 +130,12 @@ class SettingsController extends Controller
             'services.*.day' => ['required', 'integer', 'between:0,6'],
             'services.*.opens' => ['required', 'date_format:H:i'],
             'services.*.closes' => ['required', 'date_format:H:i'],
+            'services.*.ends' => ['nullable', 'date_format:H:i'],
         ];
 
         foreach (array_keys((array) $request->input('services')) as $index) {
             $rules["services.{$index}.closes"][] = "after:services.{$index}.opens";
+            $rules["services.{$index}.ends"][] = "after:services.{$index}.opens";
         }
 
         $validated = $request->validate($rules);
@@ -150,7 +152,7 @@ class SettingsController extends Controller
 
             $used->push($key);
 
-            return [...$service, 'key' => $key, 'day' => (int) $service['day']];
+            return [...$service, 'key' => $key, 'day' => (int) $service['day'], 'ends' => $service['ends'] ?? $service['closes']];
         })->values()->all();
 
         Settings::set('services', $services);

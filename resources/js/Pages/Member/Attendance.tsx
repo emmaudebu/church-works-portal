@@ -1,8 +1,34 @@
 import MemberLayout from '@/Layouts/MemberLayout';
 import { Head, Link } from '@inertiajs/react';
-import { Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import {
+    Check,
+    ChevronLeft,
+    ChevronRight,
+    Clock,
+    LogIn,
+    LogOut,
+    X,
+} from 'lucide-react';
 
-type Day = { id: number; date: string; title: string; present: boolean };
+type Day = {
+    id: number;
+    date: string;
+    title: string;
+    present: boolean;
+    time_in: string | null;
+    time_out: string | null;
+    served: string | null;
+};
+
+function dateLabel(date: string): string {
+    const [year, month, day] = date.split('-').map(Number);
+
+    return new Date(year, month - 1, day).toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+    });
+}
 
 export default function Attendance({
     month,
@@ -125,6 +151,67 @@ export default function Attendance({
                     Missed
                 </li>
             </ul>
+
+            {days.length > 0 && (
+                <section className="mt-6">
+                    <h2 className="text-xl">Services in {monthLabel}</h2>
+                    <ul className="card mt-3 divide-y divide-neutral-200">
+                        {[...days].reverse().map((day) => (
+                            <li
+                                key={day.id}
+                                className="flex flex-wrap items-center justify-between gap-3 p-4 text-sm"
+                            >
+                                <span className="min-w-0">
+                                    <span className="block font-medium">
+                                        {day.title}
+                                    </span>
+                                    <span className="text-neutral-600">
+                                        {dateLabel(day.date)}
+                                    </span>
+                                </span>
+                                {day.present ? (
+                                    <span className="flex flex-wrap items-center gap-x-4 gap-y-1 tabular-nums">
+                                        <span className="inline-flex items-center gap-1 text-success">
+                                            <LogIn size={14} aria-hidden="true" />
+                                            <span className="sr-only">In</span>
+                                            {day.time_in}
+                                        </span>
+                                        {day.time_out ? (
+                                            <>
+                                                <span className="inline-flex items-center gap-1 text-primary-700">
+                                                    <LogOut
+                                                        size={14}
+                                                        aria-hidden="true"
+                                                    />
+                                                    <span className="sr-only">
+                                                        Out
+                                                    </span>
+                                                    {day.time_out}
+                                                </span>
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-gold-50 px-2 py-0.5 text-xs font-semibold">
+                                                    <Clock
+                                                        size={12}
+                                                        aria-hidden="true"
+                                                    />
+                                                    {day.served}
+                                                </span>
+                                            </>
+                                        ) : (
+                                            <span className="text-xs text-neutral-600">
+                                                No clock-out
+                                            </span>
+                                        )}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs font-medium text-danger">
+                                        Missed
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
         </MemberLayout>
     );
 }

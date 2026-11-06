@@ -207,16 +207,19 @@ class Settings
     /**
      * The recurring services, as many as the church holds on any days.
      *
-     * @return array<int, array{key: string, title: string, day: int, opens: string, closes: string}>
+     * Each ends, and clocking out opens, at "ends", which is when attendance
+     * closes unless set.
+     *
+     * @return array<int, array{key: string, title: string, day: int, opens: string, closes: string, ends: string}>
      */
     public static function services(): array
     {
         $recurring = config('covenant.services.recurring');
 
-        return self::get('services', [
+        return array_map(fn (array $service) => [...$service, 'ends' => $service['ends'] ?? $service['closes']], self::get('services', [
             ['key' => 'sunday', 'title' => 'Sunday Service', 'day' => 0, ...$recurring['sunday']],
             ['key' => 'wednesday', 'title' => 'Wednesday Service', 'day' => 3, ...$recurring['wednesday']],
-        ]);
+        ]));
     }
 
     public static function logoUrl(string $variant): string

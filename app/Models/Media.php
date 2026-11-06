@@ -12,11 +12,21 @@ use Illuminate\Support\Facades\Storage;
 /**
  * A picture in the media library, which any section of the site can reuse.
  */
-#[Fillable(['path', 'name', 'width', 'height', 'size', 'uploaded_by'])]
+#[Fillable(['path', 'name', 'width', 'height', 'size', 'uploaded_by', 'unused_since'])]
 class Media extends Model
 {
     /** @use HasFactory<MediaFactory> */
     use HasFactory;
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return ['unused_since' => 'datetime'];
+    }
 
     /**
      * @return BelongsTo<User, $this>

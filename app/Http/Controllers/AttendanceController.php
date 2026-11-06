@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Attendance;
 use App\Models\Election;
 use App\Models\Post;
 use App\Models\Service;
@@ -142,8 +143,8 @@ class AttendanceController extends Controller
 
         $present = $user->attendance()
             ->whereIn('service_id', $held->pluck('id'))
-            ->pluck('service_id')
-            ->flip();
+            ->get()
+            ->keyBy('service_id');
 
         return Inertia::render('Member/Attendance', [
             'month' => $month->format('Y-m'),
@@ -156,6 +157,9 @@ class AttendanceController extends Controller
                 'date' => $service->date->toDateString(),
                 'title' => $service->title,
                 'present' => $present->has($service->id),
+                'time_in' => $present->get($service->id)?->checked_in_at->format('g:i A'),
+                'time_out' => $present->get($service->id)?->checked_out_at?->format('g:i A'),
+                'served' => Attendance::durationLabel($present->get($service->id)?->minutesServed()),
             ])->values(),
         ]);
     }

@@ -10,6 +10,7 @@ use App\Support\Settings;
 use Database\Seeders\DepartmentSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -175,6 +176,70 @@ test('only people who edit the site can open the library', function () {
     $this->actingAs($treasurer)->get(route('admin.media'))->assertForbidden();
     $this->actingAs($treasurer)->getJson(route('admin.media.picker'))->assertForbidden();
     $this->actingAs($member)->get(route('admin.media'))->assertForbidden();
+});
+
+test('unused pictures and gallery photos are deleted after three months, section pictures are kept', function () {
+    Carbon::setTestNow('2026-01-10 03:00:00');
+
+    $unused = libraryPicture('unused.jpg');
+    $onPage = libraryPicture('page.jpg');
+    $inGallery = libraryPicture('gallery.jpg');
+    $galleryAndPage = libraryPicture('both.jpg');
+    $this->technical->update(['image' => $onPage->path, 'about_image' => $galleryAndPage->path]);
+    DepartmentImage::create(['department_id' => $this->technical->id, 'image' => $inGallery->path]);
+    DepartmentImage::create(['department_id' => $this->technical->id, 'image' => $galleryAndPage->path]);
+
+    $this->artisan('media:prune')->assertSuccessful();
+
+    expect($unused->fresh()->unused_since->toDateString())->toBe('2026-01-10')
+        ->and($onPage->fresh()->unused_since)->toBeNull();
+
+    $this->actingAs($this->head)->getJson(route('admin.media.show', $inGallery))
+        ->assertJsonPath('deletes_on', '10 April 2026');
+    $this->actingAs($this->head)->getJson(route('admin.media.show', $galleryAndPage))
+        ->assertJsonPath('deletes_on', null);
+
+    Carbon::setTestNow('2026-04-09 03:00:00');
+    $this->artisan('media:prune');
+
+    expect(Media::count())->toBe(4)
+        ->and(DepartmentImage::count())->toBe(2);
+
+    Carbon::setTestNow('2026-04-10 03:00:00');
+    $this->artisan('media:prune');
+
+    expect(Media::pluck('id')->sort()->values()->all())->toBe([$onPage->id, $galleryAndPage->id])
+        ->and(DepartmentImage::count())->toBe(0);
+    Storage::disk('public')->assertMissing($unused->path);
+    Storage::disk('public')->assertMissing($inGallery->path);
+    Storage::disk('public')->assertExists($galleryAndPage->path);
+
+    Carbon::setTestNow();
+});
+
+test('a picture used again before its time is up is kept', function () {
+    Carbon::setTestNow('2026-01-10 03:00:00');
+    $picture = libraryPicture();
+    $this->artisan('media:prune');
+
+    $this->actingAs($this->head)->getJson(route('admin.media.show', $picture))
+        ->assertJsonPath('deletes_on', '10 April 2026');
+
+    Carbon::setTestNow('2026-03-01 03:00:00');
+    $this->technical->update(['about_image' => $picture->path]);
+    $this->artisan('media:prune');
+
+    expect($picture->fresh()->unused_since)->toBeNull();
+
+    $this->actingAs($this->head)->getJson(route('admin.media.show', $picture))
+        ->assertJsonPath('deletes_on', null);
+
+    Carbon::setTestNow('2026-06-01 03:00:00');
+    $this->artisan('media:prune');
+
+    Storage::disk('public')->assertExists($picture->path);
+
+    Carbon::setTestNow();
 });
 
 test('pictures already on the site are brought into the library', function () {

@@ -1,7 +1,7 @@
 import Avatar from '@/Components/Avatar';
 import Badge from '@/Components/Badge';
 import DangerButton from '@/Components/DangerButton';
-import ElectionResults, { TurnoutBar } from '@/Components/ElectionResults';
+import ElectionResults from '@/Components/ElectionResults';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import Modal from '@/Components/Modal';
@@ -39,7 +39,7 @@ type PositionRow = {
 
 type Member = { id: number; full_name: string };
 
-const POLL_MS = 10000;
+const POLL_MS = 4000;
 
 function Panel({ title, children }: PropsWithChildren<{ title: string }>) {
     return (
@@ -217,21 +217,19 @@ export default function Manage({
             </div>
             <div className="gold-rule mb-6" />
 
+            <div className="mb-6 max-w-5xl">
+                <ElectionResults
+                    title={election.title}
+                    results={results}
+                    turnout={turnout}
+                    live={election.status === 'open'}
+                />
+            </div>
+
             <div className="max-w-3xl space-y-6">
-                <Panel title="Results">
-                    <TurnoutBar turnout={turnout} />
 
-                    <div className="mt-4">
-                        {turnout.voted === 0 ? (
-                            <p className="text-sm text-neutral-600">
-                                No votes yet.
-                            </p>
-                        ) : (
-                            <ElectionResults results={results} />
-                        )}
-                    </div>
-
-                    <label className="mt-6 flex items-start gap-3 border-t border-neutral-200 pt-4">
+                <Panel title="Publishing">
+                    <label className="flex items-start gap-3">
                         <input
                             type="checkbox"
                             role="switch"

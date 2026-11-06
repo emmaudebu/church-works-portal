@@ -227,6 +227,16 @@ export interface Turnout {
     percent: number;
 }
 
+export interface ReceiptReady {
+    id: number;
+    purpose: string;
+    covers: string;
+    amount: number;
+    method: string;
+    download_url: string;
+    image_url: string;
+}
+
 export type PageProps<
     T extends Record<string, unknown> = Record<string, unknown>,
 > = T & {
@@ -239,6 +249,7 @@ export type PageProps<
     branding: Branding;
     popup: SitePopupData | null;
     verseToast: VerseToastData | null;
+    receiptReady: ReceiptReady | null;
     whatsappTemplates: { greeting: string; temp_password: string } | null;
     flash: {
         success: string | null;

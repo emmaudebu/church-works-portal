@@ -7,21 +7,45 @@ import {
     AlertTriangle,
     ArrowLeft,
     CheckCircle2,
+    LogIn,
+    LogOut,
     LucideIcon,
     Search,
     XCircle,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
-type Status = 'present' | 'duplicate' | 'suspended' | 'invalid' | 'closed' | 'error';
+type Status =
+    | 'present'
+    | 'duplicate'
+    | 'suspended'
+    | 'invalid'
+    | 'closed'
+    | 'error'
+    | 'out'
+    | 'already_out'
+    | 'not_checked_in'
+    | 'out_closed'
+    | 'not_ended';
+
+type Mode = 'in' | 'out';
 
 type Result = {
     status: Status;
     member?: CheckedInMember;
     checked_in_at?: string;
+    checked_out_at?: string;
+    served?: string | null;
 };
 
-type Live = { count: number; recent: CheckedInMember[] };
+type Recent = CheckedInMember & { served?: string | null };
+
+type Live = {
+    count: number;
+    out_count: number;
+    recent: Recent[];
+    recent_out: Recent[];
+};
 
 const RESCAN_MS = 3000;
 
@@ -59,7 +83,36 @@ const OUTCOMES: Record<
         className: 'bg-danger',
         icon: XCircle,
     },
+    out: {
+        label: 'Clocked out',
+        className: 'bg-success',
+        icon: LogOut,
+    },
+    already_out: {
+        label: 'Already clocked out',
+        className: 'bg-warning',
+        icon: AlertTriangle,
+    },
+    not_checked_in: {
+        label: 'Never checked in to this service',
+        className: 'bg-danger',
+        icon: XCircle,
+    },
+    out_closed: {
+        label: 'Clock-out has closed',
+        className: 'bg-warning',
+        icon: AlertTriangle,
+    },
+    not_ended: {
+        label: 'The service has not ended yet',
+        className: 'bg-warning',
+        icon: AlertTriangle,
+    },
 };
+
+/** Results that are good news, cheerful sound; the rest are warnings. */
+const SUCCESS: Status[] = ['present', 'out'];
+const GENTLE: Status[] = ['duplicate', 'closed', 'already_out', 'out_closed', 'not_ended'];
 
 function playSound(context: AudioContext | null, status: Status) {
     if (!context) {
@@ -81,7 +134,10 @@ function playSound(context: AudioContext | null, status: Status) {
     if (status === 'present') {
         tone(880, 0, 0.12, 'sine');
         tone(1320, 0.12, 0.2, 'sine');
-    } else if (status !== 'duplicate' && status !== 'closed') {
+    } else if (status === 'out') {
+        tone(1320, 0, 0.12, 'sine');
+        tone(880, 0.12, 0.2, 'sine');
+    } else if (!SUCCESS.includes(status) && !GENTLE.includes(status)) {
         tone(140, 0, 0.35, 'square');
         navigator.vibrate?.(300);
     }
@@ -99,19 +155,34 @@ function speak(text: string) {
 export default function Scanner({
     service,
     count,
+    out_count,
     recent,
+    recent_out,
 }: {
     service: {
         id: number;
         title: string;
         date_label: string;
         accepting: boolean;
+        clocking_out: boolean;
+        ended: boolean;
+        ends: string;
+        clock_out_closes: string;
     };
     count: number;
-    recent: CheckedInMember[];
+    out_count: number;
+    recent: Recent[];
+    recent_out: Recent[];
 }) {
     const { branding } = usePage<PageProps>().props;
-    const [live, setLive] = useState<Live>({ count, recent });
+    const [live, setLive] = useState<Live>({
+        count,
+        out_count,
+        recent,
+        recent_out,
+    });
+    const [mode, setMode] = useState<Mode>(service.ended ? 'out' : 'in');
+    const modeRef = useRef(mode);
     const [result, setResult] = useState<Result | null>(null);
     const [scanning, setScanning] = useState(false);
     const [cameraError, setCameraError] = useState<string | null>(null);
@@ -130,12 +201,26 @@ export default function Scanner({
             status: data.status,
             member: data.member,
             checked_in_at: data.checked_in_at,
+            checked_out_at: data.checked_out_at,
+            served: data.served,
         });
         playSound(audio.current, data.status);
 
-        if (data.count !== undefined && data.recent) {
-            setLive({ count: data.count, recent: data.recent });
+        if (data.count !== undefined && data.recent && data.recent_out) {
+            setLive({
+                count: data.count,
+                out_count: data.out_count ?? 0,
+                recent: data.recent,
+                recent_out: data.recent_out,
+            });
         }
+    };
+
+    const switchMode = (next: Mode) => {
+        modeRef.current = next;
+        setMode(next);
+        setResult(null);
+        setQuery('');
     };
 
     const send = async (url: string, body: Record<string, unknown>) => {
@@ -164,12 +249,19 @@ export default function Scanner({
         busy.current = true;
         lastScan.current = { token, at: Date.now() };
 
-        const status = await send(route('admin.scanner.check-in', service.id), {
-            token,
-        });
+        const clockingOut = modeRef.current === 'out';
+        const status = await send(
+            route(
+                clockingOut ? 'admin.scanner.check-out' : 'admin.scanner.check-in',
+                service.id,
+            ),
+            { token },
+        );
 
         if (status === 'present') {
             speak(`Welcome to ${service.title}`);
+        } else if (status === 'out') {
+            speak('Thank you for serving. Go in peace.');
         }
 
         busy.current = false;
@@ -235,7 +327,15 @@ export default function Scanner({
     const markPresent = async (id: number) => {
         audio.current ??= new AudioContext();
 
-        await send(route('admin.scanner.manual', service.id), { user_id: id });
+        await send(
+            route(
+                mode === 'out'
+                    ? 'admin.scanner.manual-out'
+                    : 'admin.scanner.manual',
+                service.id,
+            ),
+            { user_id: id },
+        );
 
         setQuery('');
     };
@@ -266,14 +366,66 @@ export default function Scanner({
                 <div className="mt-3 text-center">
                     <h1 className="text-2xl">{service.title}</h1>
                     <p className="text-sm text-silver-300">
-                        Scan member QR codes · {service.date_label}
+                        {service.date_label} · Ends {service.ends}
                     </p>
                 </div>
 
-                {!service.accepting && (
+                <div
+                    role="radiogroup"
+                    aria-label="Scanner mode"
+                    className="relative mx-auto mt-4 grid max-w-xs grid-cols-2 rounded-full bg-white/10 p-1 ring-1 ring-white/10"
+                >
+                    <span
+                        aria-hidden="true"
+                        className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full shadow-lg transition-all duration-300 ease-out ${
+                            mode === 'in'
+                                ? 'translate-x-0 bg-success'
+                                : 'translate-x-full bg-gradient-to-r from-gold-500 to-gold-300'
+                        }`}
+                    />
+                    {(
+                        [
+                            ['in', 'Check in', LogIn],
+                            ['out', 'Check out', LogOut],
+                        ] as const
+                    ).map(([value, label, Icon]) => (
+                        <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={mode === value}
+                            onClick={() => switchMode(value)}
+                            className={`relative flex items-center justify-center gap-2 rounded-full py-2 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 ${
+                                mode === value
+                                    ? value === 'out'
+                                        ? 'text-charcoal-900'
+                                        : 'text-white'
+                                    : 'text-silver-300'
+                            }`}
+                        >
+                            <Icon size={16} strokeWidth={2} aria-hidden="true" />
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
+                {mode === 'in' && !service.accepting && (
                     <p className="mt-3 rounded-lg bg-warning p-2 text-center text-sm">
-                        Attendance is closed. Scans are refused, but you can
+                        Check-in is closed. Scans are refused, but you can
                         still mark people present by hand.
+                    </p>
+                )}
+                {mode === 'out' && !service.clocking_out && (
+                    <p className="mt-3 rounded-lg bg-warning p-2 text-center text-sm">
+                        {service.ended
+                            ? `Clock-out closed at ${service.clock_out_closes}. You can still clock people out by hand.`
+                            : `Clock-out opens when the service ends at ${service.ends}.`}
+                    </p>
+                )}
+                {mode === 'out' && service.clocking_out && (
+                    <p className="mt-3 rounded-lg bg-white/10 p-2 text-center text-sm text-silver-300">
+                        Scan members as they leave. Clock-out is open until{' '}
+                        {service.clock_out_closes}.
                     </p>
                 )}
 
@@ -344,7 +496,16 @@ export default function Scanner({
                                     {outcome.label}
                                     {result.status === 'duplicate' &&
                                         ` at ${result.checked_in_at}`}
+                                    {(result.status === 'out' ||
+                                        result.status === 'already_out') &&
+                                        ` at ${result.checked_out_at}`}
                                 </p>
+                                {result.status === 'out' && result.served && (
+                                    <p className="text-sm">
+                                        Served {result.served} (in at{' '}
+                                        {result.checked_in_at})
+                                    </p>
+                                )}
                                 {result.member?.unit && (
                                     <p className="text-sm">
                                         {result.member.unit}
@@ -358,11 +519,11 @@ export default function Scanner({
                 <ul className="mt-3 flex justify-center gap-4 text-xs text-silver-300">
                     <li className="flex items-center gap-1">
                         <span className="h-2.5 w-2.5 rounded-full bg-success" />
-                        Present
+                        {mode === 'out' ? 'Clocked out' : 'Present'}
                     </li>
                     <li className="flex items-center gap-1">
                         <span className="h-2.5 w-2.5 rounded-full bg-warning" />
-                        Already checked in
+                        {mode === 'out' ? 'Already out' : 'Already checked in'}
                     </li>
                     <li className="flex items-center gap-1">
                         <span className="h-2.5 w-2.5 rounded-full bg-danger" />
@@ -376,9 +537,13 @@ export default function Scanner({
                             data-testid="count"
                             className="text-3xl font-semibold tabular-nums"
                         >
-                            {live.count}
+                            {mode === 'out' ? live.out_count : live.count}
                         </p>
-                        <p className="text-xs text-silver-300">Checked in</p>
+                        <p className="text-xs text-silver-300">
+                            {mode === 'out'
+                                ? `Out of ${live.count}`
+                                : 'Checked in'}
+                        </p>
                     </div>
                     <div className="relative rounded-2xl bg-white/10 p-4">
                         <label
@@ -423,9 +588,11 @@ export default function Scanner({
                                         {member.full_name}
                                     </span>
                                     <span className="text-xs text-gold-300">
-                                        {member.status === 'active'
-                                            ? 'Mark present'
-                                            : member.status}
+                                        {member.status !== 'active'
+                                            ? member.status
+                                            : mode === 'out'
+                                              ? 'Clock out'
+                                              : 'Mark present'}
                                     </span>
                                 </button>
                             </li>
@@ -434,14 +601,22 @@ export default function Scanner({
                 )}
 
                 <section className="mt-6">
-                    <h2 className="text-lg">Recent check-ins</h2>
-                    {live.recent.length === 0 ? (
+                    <h2 className="text-lg">
+                        {mode === 'out' ? 'Recent clock-outs' : 'Recent check-ins'}
+                    </h2>
+                    {(mode === 'out' ? live.recent_out : live.recent).length ===
+                    0 ? (
                         <p className="mt-2 text-sm text-silver-300">
-                            Nobody has checked in yet.
+                            {mode === 'out'
+                                ? 'Nobody has clocked out yet.'
+                                : 'Nobody has checked in yet.'}
                         </p>
                     ) : (
                         <ul className="mt-2 space-y-2">
-                            {live.recent.map((member) => (
+                            {(mode === 'out'
+                                ? live.recent_out
+                                : live.recent
+                            ).map((member) => (
                                 <li
                                     key={member.attendance_id}
                                     className="flex items-center gap-3 text-sm"
@@ -453,8 +628,13 @@ export default function Scanner({
                                     <span className="min-w-0 flex-1 truncate">
                                         {member.full_name}
                                     </span>
-                                    <span className="tabular-nums text-silver-300">
+                                    <span className="text-right tabular-nums text-silver-300">
                                         {member.checked_in_at}
+                                        {member.served && (
+                                            <span className="block text-xs text-gold-300">
+                                                {member.served}
+                                            </span>
+                                        )}
                                     </span>
                                 </li>
                             ))}

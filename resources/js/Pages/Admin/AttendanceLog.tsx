@@ -2,9 +2,10 @@ import Avatar from '@/Components/Avatar';
 import Badge from '@/Components/Badge';
 import EmptyState from '@/Components/EmptyState';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import InputError from '@/Components/InputError';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { ClipboardList, Download } from 'lucide-react';
-import { useState } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 type ServiceOption = {
     id: number;
@@ -14,6 +15,7 @@ type ServiceOption = {
 
 type Entry = {
     position: number;
+    attendance_id: number;
     id: number;
     full_name: string;
     member_id: string | null;
@@ -23,7 +25,107 @@ type Entry = {
     time: string;
     method: string;
     recorded_by: string | null;
+    out_time: string | null;
+    served: string | null;
+    clock_out: 'out' | 'pending' | 'missing' | 'unrecorded';
 };
+
+/**
+ * Fill in the time someone left when they were never scanned out.
+ */
+function AddClockOut({ entry }: { entry: Entry }) {
+    const [open, setOpen] = useState(false);
+    const form = useForm({ time: '' });
+
+    const save: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.patch(route('admin.attendance.check-out', entry.attendance_id), {
+            preserveScroll: true,
+            onSuccess: () => setOpen(false),
+        });
+    };
+
+    if (!open) {
+        return (
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="mt-1 block text-xs font-medium text-primary-700 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+            >
+                Add time
+            </button>
+        );
+    }
+
+    return (
+        <form onSubmit={save} className="mt-1 flex flex-wrap items-center gap-1">
+            <input
+                type="time"
+                required
+                aria-label={`Time ${entry.full_name} left`}
+                value={form.data.time}
+                onChange={(e) => form.setData('time', e.target.value)}
+                className="rounded-lg border-neutral-200 py-1 text-xs focus:border-primary-700 focus:ring-primary-700"
+            />
+            <button
+                type="submit"
+                disabled={form.processing}
+                className="rounded-lg bg-primary-700 px-2 py-1 text-xs font-semibold text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700 focus-visible:ring-offset-1"
+            >
+                Save
+            </button>
+            <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="px-1 text-xs text-neutral-600"
+            >
+                Cancel
+            </button>
+            <InputError message={form.errors.time} className="w-full" />
+        </form>
+    );
+}
+
+function ClockOutCell({
+    entry,
+    ended,
+    canFix,
+}: {
+    entry: Entry;
+    ended: boolean;
+    canFix: boolean;
+}) {
+    if (entry.clock_out === 'out') {
+        return (
+            <>
+                <span className="font-semibold">{entry.out_time}</span>
+                <span className="mt-0.5 block w-fit rounded-full bg-gold-50 px-2 py-0.5 text-xs font-semibold text-neutral-900">
+                    {entry.served}
+                </span>
+            </>
+        );
+    }
+
+    if (entry.clock_out === 'pending') {
+        return (
+            <span className="text-xs text-neutral-600">
+                {ended ? 'Not out yet' : 'In service'}
+            </span>
+        );
+    }
+
+    return (
+        <>
+            {entry.clock_out === 'missing' ? (
+                <Badge variant="warning">No clock-out</Badge>
+            ) : (
+                <span className="text-neutral-600">—</span>
+            )}
+            {canFix && <AddClockOut entry={entry} />}
+        </>
+    );
+}
 
 const inputClass =
     'mt-1 block w-full rounded-lg border-neutral-200 text-sm focus:border-primary-700 focus:ring-primary-700';
@@ -32,6 +134,7 @@ export default function AttendanceLog({
     services,
     service,
     entries,
+    canFix,
 }: {
     services: ServiceOption[];
     service: {
@@ -39,11 +142,18 @@ export default function AttendanceLog({
         title: string;
         date_label: string;
         window: string;
+        clock_out_window: string;
+        used_clock_out: boolean;
+        ended: boolean;
         department: string;
     } | null;
     entries: Entry[];
+    canFix: boolean;
 }) {
     const [search, setSearch] = useState('');
+    const missing = entries.filter(
+        (entry) => entry.clock_out === 'missing',
+    ).length;
 
     const term = search.trim().toLowerCase();
     const shown = term
@@ -134,14 +244,41 @@ export default function AttendanceLog({
                             <div>
                                 <h2 className="text-xl">{service.title}</h2>
                                 <p className="text-sm text-neutral-600">
-                                    {service.date_label} · {service.window} ·{' '}
-                                    {service.department}
+                                    {service.date_label} · {service.department}
+                                </p>
+                                <p className="text-sm text-neutral-600">
+                                    Check-in {service.window} · Clock-out{' '}
+                                    {service.clock_out_window}
                                 </p>
                             </div>
-                            <p className="text-sm font-semibold tabular-nums">
+                            <p className="text-right text-sm font-semibold tabular-nums">
                                 {entries.length} clocked in
+                                <span className="block font-normal text-neutral-600">
+                                    {
+                                        entries.filter(
+                                            (entry) => entry.clock_out === 'out',
+                                        ).length
+                                    }{' '}
+                                    clocked out
+                                    {missing > 0 && (
+                                        <span className="text-warning">
+                                            {' '}
+                                            · {missing} no clock-out
+                                        </span>
+                                    )}
+                                </span>
                             </p>
                         </div>
+
+                        {service.ended &&
+                            !service.used_clock_out &&
+                            entries.length > 0 && (
+                                <p className="mt-3 rounded-lg bg-gold-50 p-3 text-sm">
+                                    Nobody was scanned out of this service, so
+                                    clock-out was not used and no one is
+                                    flagged.
+                                </p>
+                            )}
 
                         {entries.length === 0 ? (
                             <div className="mt-4">
@@ -188,6 +325,12 @@ export default function AttendanceLog({
                                                 className="p-2 font-medium"
                                             >
                                                 Time in
+                                            </th>
+                                            <th
+                                                scope="col"
+                                                className="p-2 font-medium"
+                                            >
+                                                Time out
                                             </th>
                                             <th
                                                 scope="col"
@@ -265,6 +408,13 @@ export default function AttendanceLog({
                                                     <span className="block text-xs font-normal text-neutral-600 sm:hidden">
                                                         {entry.method}
                                                     </span>
+                                                </td>
+                                                <td className="whitespace-nowrap p-2 tabular-nums">
+                                                    <ClockOutCell
+                                                        entry={entry}
+                                                        ended={service.ended}
+                                                        canFix={canFix}
+                                                    />
                                                 </td>
                                                 <td className="hidden p-2 sm:table-cell">
                                                     <Badge

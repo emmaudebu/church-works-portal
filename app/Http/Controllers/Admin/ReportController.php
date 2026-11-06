@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exports\AttendanceExport;
 use App\Http\Controllers\Controller;
+use App\Models\Attendance;
 use App\Models\Department;
 use App\Models\User;
 use App\Support\AttendanceStats;
@@ -11,6 +12,7 @@ use App\Support\CurrentDepartment;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response as InertiaResponse;
 use Maatwebsite\Excel\Facades\Excel;
@@ -51,6 +53,18 @@ class ReportController extends Controller
     }
 
     /**
+     * The average time served across everyone, weighting each member equally.
+     *
+     * @param  Collection<int, array{no_clock_out: int, average_minutes: int|null}>  $clockOuts
+     */
+    private function averageServed(Collection $clockOuts): ?int
+    {
+        $averages = $clockOuts->pluck('average_minutes')->filter(fn (?int $minutes) => $minutes !== null);
+
+        return $averages->isNotEmpty() ? (int) round($averages->avg()) : null;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function report(Request $request): array
@@ -80,13 +94,16 @@ class ReportController extends Controller
             ->values();
 
         $rates = AttendanceStats::rates($members, $held);
+        $clockOuts = AttendanceStats::clockOuts($members, $held);
 
-        $rows = $members->map(function (User $member) use ($rates) {
+        $rows = $members->map(function (User $member) use ($rates, $clockOuts) {
             $rate = $rates[$member->id];
 
             return [
                 ...$member->only(['id', 'member_id', 'full_name', 'unit']),
                 ...$rate,
+                'no_clock_out' => $clockOuts[$member->id]['no_clock_out'],
+                'average_served' => Attendance::durationLabel($clockOuts[$member->id]['average_minutes']),
                 'group' => match (true) {
                     $rate['rate'] === null => 'No services yet',
                     $rate['rate'] >= self::REGULAR_RATE => 'Regular',
@@ -111,6 +128,8 @@ class ReportController extends Controller
                 'services' => $held->count(),
                 'regular' => $rows->where('group', 'Regular')->count(),
                 'absentees' => $rows->where('group', 'Frequent absentee')->count(),
+                'no_clock_out' => $rows->sum('no_clock_out'),
+                'average_served' => Attendance::durationLabel($this->averageServed($clockOuts)),
             ],
             'trend' => AttendanceStats::trend($held, $members->count()),
             'members' => $rows,

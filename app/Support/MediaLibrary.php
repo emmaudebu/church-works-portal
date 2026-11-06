@@ -9,6 +9,7 @@ use App\Models\Post;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -21,6 +22,9 @@ class MediaLibrary
 {
     /** The public folders whose pictures belong in the library. */
     private const FOLDERS = ['posts', 'gallery', 'popups'];
+
+    /** How long a picture nothing shows is kept before it is deleted. */
+    public const KEEP_UNUSED_MONTHS = 3;
 
     /**
      * Whether someone edits a part of the site that shows pictures.
@@ -85,11 +89,33 @@ class MediaLibrary
     }
 
     /**
-     * Where a picture is shown on the site.
+     * Where a picture is shown on the site, galleries included.
      *
      * @return array<int, string>
      */
     public static function usages(string $path): array
+    {
+        return [...self::sectionUsages($path), ...self::galleryUsages($path)];
+    }
+
+    /**
+     * The galleries a picture is in.
+     *
+     * @return array<int, string>
+     */
+    public static function galleryUsages(string $path): array
+    {
+        return DepartmentImage::where('image', $path)->with('department:id,name')->get()
+            ->map(fn (DepartmentImage $image) => "{$image->department->name} gallery")
+            ->all();
+    }
+
+    /**
+     * The sections of the site that show a picture, galleries aside.
+     *
+     * @return array<int, string>
+     */
+    public static function sectionUsages(string $path): array
     {
         $home = Settings::home();
         $places = [];
@@ -134,11 +160,6 @@ class MediaLibrary
             $places[] = "Post: {$title}";
         });
 
-        DepartmentImage::where('image', $path)->with('department:id,name')->get()
-            ->each(function (DepartmentImage $image) use (&$places) {
-                $places[] = "{$image->department->name} gallery";
-            });
-
         return $places;
     }
 
@@ -154,6 +175,68 @@ class MediaLibrary
 
         Storage::disk('public')->delete($path);
         Media::where('path', $path)->delete();
+    }
+
+    /**
+     * Clear away old pictures. Gallery photos leave the gallery three months
+     * after they were uploaded, and their file goes too unless another
+     * section shows it. Any other picture is deleted once nothing has shown
+     * it for three months: each run notes when a picture fell out of use,
+     * and forgets it again if it is used once more.
+     *
+     * @return int How many pictures were deleted.
+     */
+    public static function pruneUnused(): int
+    {
+        $cutoff = now()->subMonths(self::KEEP_UNUSED_MONTHS);
+        $before = Media::count();
+
+        DepartmentImage::where('created_at', '<=', $cutoff)->lazyById()->each(function (DepartmentImage $image) {
+            $image->delete();
+            self::discard($image->image);
+        });
+
+        $deleted = $before - Media::count();
+
+        Media::query()->lazyById()->each(function (Media $media) use ($cutoff, &$deleted) {
+            if (self::usages($media->path) !== []) {
+                if ($media->unused_since) {
+                    $media->update(['unused_since' => null]);
+                }
+
+                return;
+            }
+
+            if (! $media->unused_since) {
+                $media->update(['unused_since' => now()]);
+
+                return;
+            }
+
+            if ($media->unused_since->lte($cutoff)) {
+                Storage::disk('public')->delete($media->path);
+                $media->delete();
+                $deleted++;
+            }
+        });
+
+        return $deleted;
+    }
+
+    /**
+     * When a picture will be deleted: three months after it went into a
+     * gallery, or after it fell out of use. Null while a section shows it.
+     */
+    public static function deletesOn(Media $media): ?string
+    {
+        if (self::sectionUsages($media->path) !== []) {
+            return null;
+        }
+
+        $addedToGallery = DepartmentImage::where('image', $media->path)->min('created_at');
+        $from = $addedToGallery ? Carbon::parse($addedToGallery) : ($media->unused_since ?? now());
+
+        return $from->addMonths(self::KEEP_UNUSED_MONTHS)->format('j F Y');
     }
 
     /**

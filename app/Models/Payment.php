@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'due_id', 'purpose', 'period', 'amount', 'reference', 'batch', 'status', 'method', 'receipt', 'rejection_reason', 'paid_at', 'recorded_by'])]
+#[Fillable(['user_id', 'due_id', 'purpose', 'period', 'amount', 'reference', 'batch', 'status', 'method', 'receipt', 'rejection_reason', 'paid_at', 'receipt_seen_at', 'recorded_by'])]
 class Payment extends Model
 {
     /**
@@ -18,7 +18,7 @@ class Payment extends Model
      */
     protected function casts(): array
     {
-        return ['paid_at' => 'datetime', 'amount' => 'integer'];
+        return ['paid_at' => 'datetime', 'receipt_seen_at' => 'datetime', 'amount' => 'integer'];
     }
 
     /**
@@ -68,6 +68,8 @@ class Payment extends Model
             'paid_at' => $this->paid_at?->format('j M Y, g:i A'),
             'member' => $this->user?->full_name,
             'receipt_url' => $this->receipt ? route('payments.receipt', $this) : null,
+            'download_url' => $this->status === 'success' ? route('payments.receipt.download', $this) : null,
+            'image_url' => $this->status === 'success' ? route('payments.receipt.download', [$this, 'jpg']) : null,
         ];
     }
 }

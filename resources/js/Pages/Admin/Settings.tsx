@@ -18,6 +18,7 @@ type RecurringService = {
     day: number;
     opens: string;
     closes: string;
+    ends: string;
 };
 type Person = { id: number; full_name: string };
 type OfficeRow = {
@@ -287,6 +288,7 @@ function ServicesForm({ services }: { services: RecurringService[] }) {
                 day: 0,
                 opens: '09:00',
                 closes: '11:00',
+                ends: '11:00',
             },
         ]);
 
@@ -399,6 +401,26 @@ function ServicesForm({ services }: { services: RecurringService[] }) {
                             />
                             <InputError
                                 message={errors[`services.${index}.closes`]}
+                                className="mt-2"
+                            />
+                        </div>
+                        <div>
+                            <InputLabel
+                                htmlFor={`service-${index}-ends`}
+                                value="Service ends (clock-out opens)"
+                            />
+                            <TextInput
+                                id={`service-${index}-ends`}
+                                type="time"
+                                value={service.ends}
+                                onChange={(e) =>
+                                    change(index, 'ends', e.target.value)
+                                }
+                                required
+                                className="mt-1 block w-full"
+                            />
+                            <InputError
+                                message={errors[`services.${index}.ends`]}
                                 className="mt-2"
                             />
                         </div>

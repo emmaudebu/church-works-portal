@@ -2,7 +2,24 @@ import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react';
 import Avatar from '@/Components/Avatar';
 import Dropdown from '@/Components/Dropdown';
 import InstallPrompt from '@/Components/InstallPrompt';
+import ReceiptPrompt from '@/Components/ReceiptPrompt';
 import Logo from '@/Components/Logo';
+import {
+    HOP,
+    NavItem,
+    POP,
+    SCAN,
+    SidebarBackdrop,
+    SidebarGroup,
+    SidebarLink,
+    SidebarProfile,
+    SidebarTooltip,
+    SWING,
+    Tip,
+    TURN,
+    useMenuEntrance,
+    WIGGLE,
+} from '@/Components/Sidebar';
 import Toast from '@/Components/Toast';
 import { PageProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
@@ -12,12 +29,10 @@ import {
     Building2,
     CalendarClock,
     ChevronsLeft,
-    ChevronsRight,
     ClipboardList,
     ImagePlus,
     Images,
     LayoutDashboard,
-    LucideIcon,
     Menu,
     Newspaper,
     ScanLine,
@@ -30,81 +45,110 @@ import {
 } from 'lucide-react';
 import { FormEventHandler, PropsWithChildren, useState } from 'react';
 
-const navItems: {
-    label: string;
-    route: string;
-    icon: LucideIcon;
-    superAdmin?: boolean;
-    permission?: string;
-    /** Shown when the person has any one of these. */
-    anyPermission?: string[];
-}[] = [
-    { label: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard },
-    { label: 'Members', route: 'admin.members', icon: Users },
+
+const GROUPS = ['Overview', 'Attendance', 'Finance', 'Content', 'Manage'];
+
+const navItems: NavItem[] = [
+    {
+        label: 'Dashboard',
+        route: 'admin.dashboard',
+        icon: LayoutDashboard,
+        group: 'Overview',
+        motion: POP,
+    },
+    {
+        label: 'Members',
+        route: 'admin.members',
+        icon: Users,
+        group: 'Overview',
+        motion: HOP,
+    },
     {
         label: 'Scanner',
         route: 'admin.scanner',
         icon: ScanLine,
+        group: 'Attendance',
+        motion: SCAN,
         permission: 'take_attendance',
     },
     {
         label: 'Services',
         route: 'admin.services',
         icon: CalendarClock,
+        group: 'Attendance',
+        motion: WIGGLE,
         permission: 'manage_services',
     },
     {
         label: 'Reports',
         route: 'admin.reports',
         icon: BarChart3,
+        group: 'Attendance',
+        motion: HOP,
         permission: 'view_reports',
     },
     {
         label: 'Attendance Log',
         route: 'admin.attendance-log',
         icon: ClipboardList,
+        group: 'Attendance',
+        motion: SWING,
         permission: 'view_reports',
     },
     {
         label: 'Payments',
         route: 'admin.payments',
         icon: Wallet,
+        group: 'Finance',
+        motion: WIGGLE,
         permission: 'view_payments',
     },
     {
         label: 'Posts',
         route: 'admin.posts',
         icon: Newspaper,
+        group: 'Content',
+        motion: SWING,
         permission: 'manage_posts',
     },
     {
         label: 'Elections',
         route: 'admin.elections',
         icon: Vote,
+        group: 'Content',
+        motion: HOP,
         permission: 'manage_elections',
     },
     {
         label: 'Upload Gallery',
         route: 'gallery.upload',
         icon: ImagePlus,
+        group: 'Content',
+        motion: POP,
         permission: 'upload_gallery',
     },
     {
         label: 'Media Library',
         route: 'admin.media',
         icon: Images,
+        group: 'Content',
+        motion: WIGGLE,
         anyPermission: ['manage_department', 'manage_posts'],
     },
     {
         label: 'Departments',
         route: 'admin.departments',
         icon: Building2,
+        group: 'Manage',
+        motion: HOP,
         superAdmin: true,
     },
     {
         label: 'Settings',
         route: 'admin.settings',
         icon: Settings,
+        group: 'Manage',
+        motion: TURN,
         superAdmin: true,
     },
 ];
@@ -128,8 +172,9 @@ function SidebarNav({
 }) {
     const { auth, pendingReceipts } = usePage<PageProps>().props;
     const { department_id: departmentId, permissions } = auth.user;
+    const entering = useMenuEntrance();
 
-    const ownDepartment =
+    const ownDepartment: NavItem[] =
         !isSuperAdmin &&
         departmentId &&
         permissions.includes('manage_department')
@@ -138,69 +183,64 @@ function SidebarNav({
                       label: 'My department',
                       route: 'admin.departments.manage',
                       icon: Building2,
+                      group: 'Manage',
+                      motion: HOP,
                       params: departmentId,
-                      superAdmin: false,
                   },
               ]
             : [];
 
-    return (
-        <nav aria-label="Admin" className="flex-1 space-y-1 overflow-y-auto p-3">
-            {[
-                ...navItems.filter(
-                    (item) =>
-                        (!item.superAdmin || isSuperAdmin) &&
-                        (!item.permission ||
-                            permissions.includes(item.permission)) &&
-                        (!item.anyPermission ||
-                            item.anyPermission.some((permission) =>
-                                permissions.includes(permission),
-                            )),
-                ),
-                ...ownDepartment,
-            ]
-                .map((item) => {
-                    const active = route().current(item.route);
-                    const Icon = item.icon;
-                    const params =
-                        'params' in item ? (item.params as number) : undefined;
+    const items = [
+        ...navItems.filter(
+            (item) =>
+                (!item.superAdmin || isSuperAdmin) &&
+                (!item.permission || permissions.includes(item.permission)) &&
+                (!item.anyPermission ||
+                    item.anyPermission.some((permission) =>
+                        permissions.includes(permission),
+                    )),
+        ),
+        ...ownDepartment,
+    ];
 
-                    return (
-                        <Link
-                            key={item.route}
-                            href={route(item.route, params)}
-                            aria-current={active ? 'page' : undefined}
-                            aria-label={collapsed ? item.label : undefined}
-                            title={collapsed ? item.label : undefined}
-                            className={`flex items-center gap-3 rounded-lg border-l-2 px-3 py-2.5 text-sm font-medium text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300 ${
-                                active
-                                    ? 'border-gold-500 bg-white/10'
-                                    : 'border-transparent hover:bg-white/5'
-                            }`}
-                        >
-                            <Icon
-                                size={20}
-                                strokeWidth={1.75}
-                                aria-hidden="true"
-                                className="shrink-0"
+    const [tip, setTip] = useState<Tip | null>(null);
+
+    let index = 0;
+
+    return (
+        <nav
+            aria-label="Admin"
+            onScroll={() => setTip(null)}
+            className="relative flex-1 overflow-y-auto overflow-x-hidden px-3 pb-3 [scrollbar-width:none]"
+        >
+            {collapsed && <SidebarTooltip tip={tip} />}
+            {GROUPS.map((group) => {
+                const inGroup = items.filter((item) => item.group === group);
+
+                if (inGroup.length === 0) {
+                    return null;
+                }
+
+                return (
+                    <SidebarGroup key={group} title={group} collapsed={collapsed}>
+                        {inGroup.map((item) => (
+                            <SidebarLink
+                                key={item.route}
+                                item={item}
+                                collapsed={collapsed}
+                                index={index++}
+                                entering={entering}
+                                badge={
+                                    item.route === 'admin.payments'
+                                        ? pendingReceipts
+                                        : 0
+                                }
+                                onTip={setTip}
                             />
-                            {!collapsed && item.label}
-                            {item.route === 'admin.payments' &&
-                                pendingReceipts > 0 && (
-                                    <span
-                                        title="Proofs of payment to approve"
-                                        className="ml-auto rounded-full bg-gold-500 px-2 py-0.5 text-xs font-semibold tabular-nums text-neutral-900"
-                                    >
-                                        {pendingReceipts}
-                                        <span className="sr-only">
-                                            {' '}
-                                            to approve
-                                        </span>
-                                    </span>
-                                )}
-                        </Link>
-                    );
-                })}
+                        ))}
+                    </SidebarGroup>
+                );
+            })}
         </nav>
     );
 }
@@ -309,11 +349,16 @@ export default function AdminLayout({ children }: PropsWithChildren) {
     return (
         <div className="min-h-screen bg-neutral-50 lg:flex">
             <aside
-                className={`sticky top-0 hidden h-screen shrink-0 flex-col bg-primary-900 transition-all lg:flex ${
-                    collapsed ? 'w-[72px]' : 'w-64'
+                className={`sticky top-0 z-40 hidden h-screen shrink-0 flex-col transition-[width] duration-300 ease-out lg:flex ${
+                    collapsed ? 'w-[84px]' : 'w-[17rem]'
                 }`}
             >
-                <div className="flex h-16 items-center px-4">
+                <SidebarBackdrop />
+                <div
+                    className={`relative flex h-20 items-center ${
+                        collapsed ? 'justify-center px-2' : 'px-5'
+                    }`}
+                >
                     {collapsed ? (
                         <HomeLogo src={branding.logo_dark_url} />
                     ) : (
@@ -323,22 +368,33 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                             wordmarkClassName="text-white"
                         />
                     )}
+                    <span
+                        aria-hidden="true"
+                        className="absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-gold-500/60 to-transparent"
+                    />
                 </div>
                 <SidebarNav collapsed={collapsed} isSuperAdmin={isSuperAdmin} />
-                <button
-                    type="button"
-                    onClick={toggleCollapsed}
-                    aria-label={
-                        collapsed ? 'Expand sidebar' : 'Collapse sidebar'
-                    }
-                    className="m-3 flex items-center justify-center rounded-lg p-2 text-silver-300 transition hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
-                >
-                    {collapsed ? (
-                        <ChevronsRight size={20} strokeWidth={1.75} />
-                    ) : (
-                        <ChevronsLeft size={20} strokeWidth={1.75} />
-                    )}
-                </button>
+                <div className="relative pb-3 pt-2">
+                    <SidebarProfile collapsed={collapsed} />
+                    <button
+                        type="button"
+                        onClick={toggleCollapsed}
+                        aria-label={
+                            collapsed ? 'Expand sidebar' : 'Collapse sidebar'
+                        }
+                        className="group mx-3 mt-2 flex w-[calc(100%-1.5rem)] items-center justify-center gap-2 rounded-xl p-2 text-xs font-medium text-silver-300 transition hover:bg-white/[0.07] hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-gold-300"
+                    >
+                        <ChevronsLeft
+                            size={18}
+                            strokeWidth={2}
+                            aria-hidden="true"
+                            className={`transition-transform duration-500 ${
+                                collapsed ? 'rotate-180' : 'group-hover:-translate-x-1'
+                            }`}
+                        />
+                        {!collapsed && 'Collapse'}
+                    </button>
+                </div>
             </aside>
 
             <Dialog
@@ -347,9 +403,16 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                 aria-label="Navigation"
                 className="relative z-40 lg:hidden"
             >
-                <DialogBackdrop className="fixed inset-0 bg-charcoal-900/60" />
-                <DialogPanel className="fixed inset-y-0 left-0 flex w-64 flex-col bg-primary-900">
-                    <div className="flex h-16 items-center justify-between px-4">
+                <DialogBackdrop
+                    transition
+                    className="fixed inset-0 bg-charcoal-900/60 backdrop-blur-sm transition duration-300 data-[closed]:opacity-0"
+                />
+                <DialogPanel
+                    transition
+                    className="fixed inset-y-0 left-0 flex w-72 flex-col transition duration-300 ease-out data-[closed]:-translate-x-full"
+                >
+                    <SidebarBackdrop />
+                    <div className="relative flex h-16 items-center justify-between px-4">
                         <HomeLogo src={branding.logo_dark_url} />
                         <button
                             type="button"
@@ -361,6 +424,9 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                         </button>
                     </div>
                     <SidebarNav collapsed={false} isSuperAdmin={isSuperAdmin} />
+                    <div className="relative pb-4 pt-2">
+                        <SidebarProfile collapsed={false} />
+                    </div>
                 </DialogPanel>
             </Dialog>
 
@@ -418,6 +484,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
 
                 <Toast />
                 <InstallPrompt />
+                <ReceiptPrompt />
 
                 <main className="flex-1 p-4 lg:p-8">{children}</main>
             </div>

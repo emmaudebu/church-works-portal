@@ -31,6 +31,7 @@ function Details({
     onClose: () => void;
 }) {
     const [usages, setUsages] = useState<string[] | null>(null);
+    const [deletesOn, setDeletesOn] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [deleting, setDeleting] = useState(false);
     const errors = usePage().props.errors as Record<string, string>;
@@ -44,7 +45,10 @@ function Details({
             credentials: 'same-origin',
         })
             .then((response) => response.json())
-            .then((result: { usages: string[] }) => setUsages(result.usages))
+            .then((result: { usages: string[]; deletes_on: string | null }) => {
+                setUsages(result.usages);
+                setDeletesOn(result.deletes_on);
+            })
             .catch(() => setUsages([]));
     }, [item.id]);
 
@@ -119,6 +123,14 @@ function Details({
                                 <li key={place}>{place}</li>
                             ))}
                         </ul>
+                    )}
+                    {deletesOn && (
+                        <p className="mt-2 rounded-lg bg-gold-50 p-2 text-sm">
+                            Gallery photos and unused pictures are cleared
+                            after 3 months. This one will be deleted on{' '}
+                            <strong>{deletesOn}</strong> unless you use it in a
+                            section of the site.
+                        </p>
                     )}
                 </div>
 

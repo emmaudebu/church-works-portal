@@ -27,6 +27,9 @@
         · Services held: <strong>{{ $summary['services'] }}</strong>
         · Regular: <strong>{{ $summary['regular'] }}</strong>
         · Frequent absentees: <strong>{{ $summary['absentees'] }}</strong>
+        <br>
+        Average time served: <strong>{{ $summary['average_served'] ?? 'n/a' }}</strong>
+        · Missed clock-outs: <strong>{{ $summary['no_clock_out'] }}</strong>
     </p>
     <table>
         <thead>
@@ -37,6 +40,8 @@
                 <th class="num">Days attended</th>
                 <th class="num">Service days</th>
                 <th class="num">Rate</th>
+                <th class="num">Avg. served</th>
+                <th class="num">No clock-out</th>
                 <th>Group</th>
             </tr>
         </thead>
@@ -49,6 +54,8 @@
                     <td class="num">{{ $member['attended'] }}</td>
                     <td class="num">{{ $member['total'] }}</td>
                     <td class="num">{{ $member['rate'] === null ? '-' : $member['rate'].'%' }}</td>
+                    <td class="num">{{ $member['average_served'] ?? '-' }}</td>
+                    <td class="num">{{ $member['no_clock_out'] ?: '-' }}</td>
                     <td>{{ $member['group'] }}</td>
                 </tr>
             @endforeach

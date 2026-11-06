@@ -53,13 +53,17 @@ class MediaController extends Controller
     }
 
     /**
-     * Where a picture is used, shown before it can be deleted.
+     * Where a picture is used, shown before it can be deleted, and when an
+     * unused one will be cleared away.
      */
     public function show(Request $request, Media $media): JsonResponse
     {
         $this->authorizeLibrary($request);
 
-        return response()->json(['usages' => MediaLibrary::usages($media->path)]);
+        return response()->json([
+            'usages' => MediaLibrary::usages($media->path),
+            'deletes_on' => MediaLibrary::deletesOn($media),
+        ]);
     }
 
     /**

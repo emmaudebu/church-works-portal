@@ -82,7 +82,7 @@ class ElectionController extends Controller
         abort_unless($election->results_public, 404);
 
         return Inertia::render('Member/Elections/Results', [
-            'election' => $election->only(['id', 'title']),
+            'election' => [...$election->only(['id', 'title']), 'status' => $election->status()],
             'results' => Ballot::results($election),
             'turnout' => Ballot::turnout($election),
         ]);

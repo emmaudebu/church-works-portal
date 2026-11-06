@@ -27,7 +27,7 @@ class PaymentDecided extends Notification implements ShouldQueue
         return (new WebPushMessage)
             ->title($this->approved ? 'Payment approved' : 'Proof of payment not accepted')
             ->body($this->approved
-                ? "Your payment for {$this->purpose} has been recorded."
+                ? "Your payment for {$this->purpose} has been recorded. Tap to download your receipt."
                 : "Please check the reason and upload your proof for {$this->purpose} again.")
             ->icon('/images/icons/icon-192.png')
             ->data(['url' => route('member.payments', absolute: false)]);

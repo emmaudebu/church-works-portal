@@ -6,6 +6,7 @@ use App\Models\Attendance;
 use App\Models\Service;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Carbon;
 
 /**
  * Every rule about whether a person can be marked present lives here, so the
@@ -50,6 +51,72 @@ class CheckIn
         }
 
         return self::record($service, $member, 'manual', $admin);
+    }
+
+    /**
+     * Clock someone out from a scanned token, only once the service has ended
+     * and while clock-out is open.
+     *
+     * @return array<string, mixed>
+     */
+    public static function scanOut(Service $service, string $token, User $admin): array
+    {
+        $member = User::firstWhere('qr_token', $token);
+
+        if (! $member || $member->department_id !== $service->department_id) {
+            return ['status' => 'invalid'];
+        }
+
+        if (! $service->acceptsCheckOuts()) {
+            return ['status' => $service->hasEnded() ? 'out_closed' : 'not_ended'];
+        }
+
+        return self::recordOut($service, $member, $admin);
+    }
+
+    /**
+     * Clock someone out by hand, which also lets an admin fill in a missed
+     * clock-out after the window has closed, at the time they give.
+     *
+     * @return array<string, mixed>
+     */
+    public static function manualOut(Service $service, User $member, User $admin, ?Carbon $at = null): array
+    {
+        if ($member->department_id !== $service->department_id) {
+            return ['status' => 'invalid'];
+        }
+
+        if (! $service->hasEnded()) {
+            return ['status' => 'not_ended'];
+        }
+
+        return self::recordOut($service, $member, $admin, $at);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function recordOut(Service $service, User $member, User $admin, ?Carbon $at = null): array
+    {
+        $attendance = Attendance::where(['service_id' => $service->id, 'user_id' => $member->id])->first();
+
+        if (! $attendance) {
+            return ['status' => 'not_checked_in', 'member' => self::present($member)];
+        }
+
+        $clockedOut = Attendance::whereKey($attendance->id)
+            ->whereNull('checked_out_at')
+            ->update(['checked_out_at' => $at ?? now(), 'checked_out_by' => $admin->id]);
+
+        $attendance->refresh();
+
+        return [
+            'status' => $clockedOut ? 'out' : 'already_out',
+            'member' => self::present($member),
+            'checked_in_at' => $attendance->checked_in_at->format('g:i A'),
+            'checked_out_at' => $attendance->checked_out_at->format('g:i A'),
+            'served' => Attendance::durationLabel($attendance->minutesServed()),
+        ];
     }
 
     /**
