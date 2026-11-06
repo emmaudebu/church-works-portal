@@ -1,4 +1,11 @@
 import DangerButton from '@/Components/DangerButton';
+import GalleryUploadForm, {
+    EventOption,
+    newChoice,
+    OccasionPicker,
+    occasionPayload,
+    ServiceOption,
+} from '@/Components/GalleryUploadForm';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
 import OfficersPanel, { Officer, Person } from '@/Components/OfficersPanel';
@@ -6,8 +13,9 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { GalleryImage } from '@/types';
+import { GalleryImage, GalleryOccasion } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { X } from 'lucide-react';
 import { FormEventHandler, useState } from 'react';
 
 type Unit = { id: number; name: string; members: number };
@@ -269,8 +277,175 @@ function PageForm({ department }: { department: PageContent }) {
     );
 }
 
-function GalleryItem({ image }: { image: GalleryImage }) {
+type ManagedImage = GalleryImage & {
+    occasion: GalleryOccasion;
+    uploaded_by: string | null;
+};
+
+/** Who the Head has given the duty of uploading gallery pictures. */
+function UploadersPanel({
+    departmentId,
+    assigned,
+    candidates,
+}: {
+    departmentId: number;
+    assigned: Person[];
+    candidates: Person[];
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        user_id: '',
+    });
+
+    const assign: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        post(route('admin.gallery.uploaders.store', departmentId), {
+            preserveScroll: true,
+            onSuccess: () => reset(),
+        });
+    };
+
+    return (
+        <section className="card p-4 sm:p-6">
+            <h2 className="text-xl">Gallery uploaders</h2>
+            <p className="mt-1 text-sm text-neutral-600">
+                Members given this duty see "Upload service photos" on their
+                home page. Officers whose office has the upload permission can
+                already upload.
+            </p>
+
+            {assigned.length === 0 ? (
+                <p className="mt-3 text-sm text-neutral-600">
+                    Nobody has been given the duty yet.
+                </p>
+            ) : (
+                <ul className="mt-3 flex flex-wrap gap-2">
+                    {assigned.map((person) => (
+                        <li
+                            key={person.id}
+                            className="inline-flex items-center gap-1 rounded-full bg-primary-50 py-1 pl-3 pr-1 text-sm"
+                        >
+                            <span className="py-1 pr-2">{person.full_name}</span>
+                            <button
+                                type="button"
+                                aria-label={`Take the upload duty from ${person.full_name}`}
+                                onClick={() =>
+                                    router.delete(
+                                        route('admin.gallery.uploaders.destroy', [
+                                            departmentId,
+                                            person.id,
+                                        ]),
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="rounded-full p-1 text-neutral-600 hover:text-danger focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                            >
+                                <X size={14} aria-hidden="true" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <form
+                onSubmit={assign}
+                className="mt-4 flex flex-wrap items-end gap-3"
+            >
+                <div className="min-w-0 flex-1 basis-56">
+                    <InputLabel
+                        htmlFor="gallery-uploader"
+                        value="Give a member the duty"
+                    />
+                    <select
+                        id="gallery-uploader"
+                        value={data.user_id}
+                        onChange={(e) => setData('user_id', e.target.value)}
+                        className="mt-1 block w-full rounded-lg border-neutral-200 text-sm focus:border-primary-700 focus:ring-primary-700"
+                    >
+                        <option value="">Choose a member</option>
+                        {candidates.map((person) => (
+                            <option key={person.id} value={person.id}>
+                                {person.full_name}
+                            </option>
+                        ))}
+                    </select>
+                    <InputError message={errors.user_id} className="mt-2" />
+                </div>
+                <PrimaryButton disabled={processing || !data.user_id}>
+                    Assign
+                </PrimaryButton>
+            </form>
+        </section>
+    );
+}
+
+/** Moves one picture, or a whole group, to another service or event. */
+function MoveForm({
+    id,
+    action,
+    label,
+    services,
+    events,
+    onDone,
+}: {
+    id: string;
+    action: string;
+    label: string;
+    services: ServiceOption[];
+    events: EventOption[];
+    onDone: () => void;
+}) {
+    const [value, setValue] = useState(() => newChoice(services));
+    const [moving, setMoving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+        setMoving(true);
+
+        router.patch(action, occasionPayload(value), {
+            preserveScroll: true,
+            errorBag: 'move',
+            onSuccess: onDone,
+            onError: (errors) => setError(Object.values(errors)[0] ?? null),
+            onFinish: () => setMoving(false),
+        });
+    };
+
+    return (
+        <form
+            onSubmit={submit}
+            className="space-y-3 rounded-lg bg-neutral-50 p-3"
+        >
+            <OccasionPicker
+                id={id}
+                value={value}
+                onChange={setValue}
+                services={services}
+                events={events}
+            />
+            <InputError message={error ?? undefined} />
+            <div className="flex gap-2">
+                <PrimaryButton disabled={moving}>{label}</PrimaryButton>
+                <SecondaryButton type="button" onClick={onDone}>
+                    Cancel
+                </SecondaryButton>
+            </div>
+        </form>
+    );
+}
+
+function GalleryItem({
+    image,
+    services,
+    events,
+}: {
+    image: ManagedImage;
+    services: ServiceOption[];
+    events: EventOption[];
+}) {
     const [caption, setCaption] = useState(image.caption ?? '');
+    const [moving, setMoving] = useState(false);
 
     return (
         <li className="card overflow-hidden">
@@ -281,6 +456,11 @@ function GalleryItem({ image }: { image: GalleryImage }) {
                 className="aspect-[4/3] w-full object-cover"
             />
             <div className="space-y-2 p-3">
+                {image.uploaded_by && (
+                    <p className="text-xs text-neutral-600">
+                        Uploaded by {image.uploaded_by}
+                    </p>
+                )}
                 <TextInput
                     aria-label="Caption"
                     placeholder="Caption (optional)"
@@ -296,49 +476,100 @@ function GalleryItem({ image }: { image: GalleryImage }) {
                     }
                     className="block w-full text-sm"
                 />
-                <button
-                    type="button"
-                    onClick={() =>
-                        router.delete(
-                            route('admin.gallery.destroy', image.id),
-                            { preserveScroll: true },
-                        )
-                    }
-                    className="text-sm text-danger underline focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
-                >
-                    Remove picture
-                </button>
+                {moving ? (
+                    <MoveForm
+                        id={`move-${image.id}`}
+                        action={route('admin.gallery.update', image.id)}
+                        label="Move picture"
+                        services={services}
+                        events={events}
+                        onDone={() => setMoving(false)}
+                    />
+                ) : (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1">
+                        <button
+                            type="button"
+                            onClick={() => setMoving(true)}
+                            className="text-sm text-primary-700 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                        >
+                            Move
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                router.delete(
+                                    route('admin.gallery.destroy', image.id),
+                                    { preserveScroll: true },
+                                )
+                            }
+                            className="text-sm text-danger underline focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
+                        >
+                            Remove picture
+                        </button>
+                    </div>
+                )}
             </div>
         </li>
     );
 }
 
-const PICTURES_PER_UPLOAD = 12;
+function GalleryGroup({
+    images,
+    services,
+    events,
+}: {
+    images: ManagedImage[];
+    services: ServiceOption[];
+    events: EventOption[];
+}) {
+    const [moving, setMoving] = useState(false);
+    const { occasion } = images[0];
 
-/** Stays under the server's 32 MB limit for one request. */
-const BYTES_PER_UPLOAD = 24 * 1024 * 1024;
-
-function uploadBatches(files: File[]): File[][] {
-    const batches: File[][] = [];
-    let batch: File[] = [];
-    let size = 0;
-
-    for (const file of files) {
-        if (
-            batch.length > 0 &&
-            (batch.length === PICTURES_PER_UPLOAD ||
-                size + file.size > BYTES_PER_UPLOAD)
-        ) {
-            batches.push(batch);
-            batch = [];
-            size = 0;
-        }
-
-        batch.push(file);
-        size += file.size;
-    }
-
-    return batch.length > 0 ? [...batches, batch] : batches;
+    return (
+        <div>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-neutral-200 pb-2">
+                <h3 className="text-lg">
+                    {occasion.title}
+                    <span className="ml-2 font-sans text-sm font-normal text-neutral-600">
+                        {occasion.date_label && `${occasion.date_label} · `}
+                        {images.length}{' '}
+                        {images.length === 1 ? 'picture' : 'pictures'}
+                    </span>
+                </h3>
+                {!moving && (
+                    <button
+                        type="button"
+                        onClick={() => setMoving(true)}
+                        className="text-sm text-primary-700 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                    >
+                        Move all
+                    </button>
+                )}
+            </div>
+            {moving && (
+                <div className="mt-3">
+                    <MoveForm
+                        id={`move-group-${images[0].id}`}
+                        action={route('admin.gallery.occasion', images[0].id)}
+                        label={`Move ${images.length} ${images.length === 1 ? 'picture' : 'pictures'}`}
+                        services={services}
+                        events={events}
+                        onDone={() => setMoving(false)}
+                    />
+                </div>
+            )}
+            <ul className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {images.map((image) => (
+                    <GalleryItem
+                        key={image.id}
+                        image={image}
+                        services={services}
+                        events={events}
+                    />
+                ))}
+            </ul>
+        </div>
+    );
 }
 
 export default function DepartmentManage({
@@ -346,24 +577,40 @@ export default function DepartmentManage({
     canEditBank,
     units,
     images,
+    services,
+    events,
     officeManager,
+    uploaders,
 }: {
     department: { name: string; slug: string } & PageContent & Bank;
     canEditBank: boolean;
     units: Unit[];
-    images: GalleryImage[];
+    images: ManagedImage[];
+    services: ServiceOption[];
+    events: EventOption[];
     officeManager: {
         officers: Officer[];
         candidates: Person[];
         offices: Record<string, string>;
     } | null;
+    uploaders: { assigned: Person[]; candidates: Person[] } | null;
 }) {
     const errors = usePage().props.errors as Record<string, string>;
 
     const unit = useForm({ name: '' });
-    const [pictures, setPictures] = useState<File[]>([]);
-    const [uploading, setUploading] = useState<string | null>(null);
-    const [pickerKey, setPickerKey] = useState(0);
+    const groups = images.reduce<ManagedImage[][]>((all, image) => {
+        const group = all.find(
+            (pictures) => pictures[0].occasion.key === image.occasion.key,
+        );
+
+        if (group) {
+            group.push(image);
+        } else {
+            all.push([image]);
+        }
+
+        return all;
+    }, []);
 
     const addUnit: FormEventHandler = (e) => {
         e.preventDefault();
@@ -373,49 +620,6 @@ export default function DepartmentManage({
             onSuccess: () => unit.reset(),
         });
     };
-
-    /** Large selections go up a few at a time so no request is too big. */
-    const addImages: FormEventHandler = (e) => {
-        e.preventDefault();
-
-        const batches = uploadBatches(pictures);
-
-        const send = (index: number) => {
-            setUploading(
-                batches.length > 1
-                    ? `Uploading part ${index + 1} of ${batches.length}...`
-                    : 'Uploading...',
-            );
-
-            router.post(
-                route('admin.gallery.store', department.id),
-                { images: batches[index] },
-                {
-                    forceFormData: true,
-                    preserveScroll: true,
-                    preserveState: true,
-                    onSuccess: () => {
-                        if (index + 1 < batches.length) {
-                            send(index + 1);
-
-                            return;
-                        }
-
-                        setPictures([]);
-                        setPickerKey((key) => key + 1);
-                        setUploading(null);
-                    },
-                    onError: () => setUploading(null),
-                },
-            );
-        };
-
-        send(0);
-    };
-
-    const uploadError = Object.entries(errors).find(([key]) =>
-        key.startsWith('images'),
-    )?.[1];
 
     return (
         <AdminLayout>
@@ -451,6 +655,14 @@ export default function DepartmentManage({
                             offices={officeManager.offices}
                         />
                     </section>
+                )}
+
+                {uploaders && (
+                    <UploadersPanel
+                        departmentId={department.id}
+                        assigned={uploaders.assigned}
+                        candidates={uploaders.candidates}
+                    />
                 )}
 
                 <PageForm department={department} />
@@ -505,51 +717,29 @@ export default function DepartmentManage({
                 <section className="card p-4 sm:p-6">
                     <h2 className="text-xl">Gallery</h2>
                     <p className="mt-1 text-sm text-neutral-600">
-                        Pictures here appear on the department's public page.
+                        Pictures appear on the department's public gallery,
+                        grouped by the service or event they were taken at.
                     </p>
 
-                    <form onSubmit={addImages} className="mt-4 space-y-3">
-                        <label className="block text-sm font-medium">
-                            Add pictures (choose as many as you like)
-                            <input
-                                key={pickerKey}
-                                type="file"
-                                multiple
-                                accept="image/jpeg,image/png,image/webp"
-                                onChange={(e) =>
-                                    setPictures([...(e.target.files ?? [])])
-                                }
-                                className="mt-1 block w-full text-sm font-normal"
-                            />
-                        </label>
-                        <InputError message={uploadError} />
-                        <div className="flex flex-wrap items-center gap-3">
-                            <PrimaryButton
-                                disabled={
-                                    uploading !== null || pictures.length === 0
-                                }
-                            >
-                                {pictures.length > 1
-                                    ? `Upload ${pictures.length} pictures`
-                                    : 'Upload'}
-                            </PrimaryButton>
-                            {uploading && (
-                                <span
-                                    role="status"
-                                    className="text-sm text-neutral-600"
-                                >
-                                    {uploading}
-                                </span>
-                            )}
-                        </div>
-                    </form>
+                    <div className="mt-4">
+                        <GalleryUploadForm
+                            action={route('admin.gallery.store', department.id)}
+                            services={services}
+                            events={events}
+                        />
+                    </div>
 
-                    {images.length > 0 && (
-                        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                            {images.map((image) => (
-                                <GalleryItem key={image.id} image={image} />
+                    {groups.length > 0 && (
+                        <div className="mt-6 space-y-8">
+                            {groups.map((pictures) => (
+                                <GalleryGroup
+                                    key={pictures[0].occasion.key}
+                                    images={pictures}
+                                    services={services}
+                                    events={events}
+                                />
                             ))}
-                        </ul>
+                        </div>
                     )}
                 </section>
             </div>

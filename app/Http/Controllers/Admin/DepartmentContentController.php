@@ -7,10 +7,11 @@ use App\Models\Department;
 use App\Models\DepartmentImage;
 use App\Models\Unit;
 use App\Models\User;
+use App\Support\GalleryUploads;
 use App\Support\Offices;
-use App\Support\PostImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -19,8 +20,6 @@ use Inertia\Response;
 
 class DepartmentContentController extends Controller
 {
-    private const MAX_UPLOADS = 12;
-
     /**
      * Display the units and gallery of a department.
      */
@@ -41,9 +40,76 @@ class DepartmentContentController extends Controller
                 'name' => $unit->name,
                 'members' => (int) $counts->get($unit->name, 0),
             ]),
-            'images' => $department->images->map->toCard(),
+            'images' => $department->images()
+                ->reorder()
+                ->with(['service', 'uploader:id,full_name'])
+                ->orderByRaw('taken_on is null')
+                ->orderByDesc('taken_on')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn (DepartmentImage $image) => [
+                    ...$image->toCard(),
+                    'occasion' => $image->occasion(),
+                    'uploaded_by' => $image->uploader?->full_name,
+                ]),
+            'services' => GalleryUploads::services($department),
+            'events' => GalleryUploads::events($department),
             'officeManager' => $request->user()->leadsDepartment($department->id) ? $this->officeManager($request, $department) : null,
+            'uploaders' => $request->user()->leadsDepartment($department->id) ? $this->uploaders($department) : null,
         ]);
+    }
+
+    /**
+     * Who may upload gallery pictures, and who could be given the duty.
+     *
+     * @return array{assigned: Collection<int, array<string, mixed>>, candidates: Collection<int, array<string, mixed>>}
+     */
+    private function uploaders(Department $department): array
+    {
+        $people = $department->users()
+            ->where('status', 'active')
+            ->with(['roles.permissions', 'permissions'])
+            ->orderBy('full_name')
+            ->get();
+
+        $assigned = fn (User $user) => $user->permissions->contains('name', GalleryUploads::PERMISSION);
+
+        return [
+            'assigned' => $people->filter($assigned)->values()->map->only(['id', 'full_name']),
+            'candidates' => $people->reject($assigned)
+                ->reject(fn (User $user) => $user->canDo(GalleryUploads::PERMISSION))
+                ->values()
+                ->map->only(['id', 'full_name']),
+        ];
+    }
+
+    /**
+     * Give a member the duty of uploading gallery pictures.
+     */
+    public function storeUploader(Request $request, Department $department): RedirectResponse
+    {
+        abort_unless($request->user()->leadsDepartment($department->id), 403);
+
+        $validated = $request->validate([
+            'user_id' => ['required', 'integer', Rule::exists('users', 'id')->where('department_id', $department->id)->where('status', 'active')],
+        ], ['user_id.exists' => 'Choose an active member of this department.']);
+
+        $member = User::findOrFail($validated['user_id']);
+        $member->givePermissionTo(GalleryUploads::PERMISSION);
+
+        return back()->with('success', "{$member->full_name} can now upload gallery pictures.");
+    }
+
+    /**
+     * Take the gallery upload duty away from a member.
+     */
+    public function destroyUploader(Request $request, Department $department, User $user): RedirectResponse
+    {
+        abort_unless($request->user()->leadsDepartment($department->id) && $user->department_id === $department->id, 403);
+
+        $user->revokePermissionTo(GalleryUploads::PERMISSION);
+
+        return back()->with('success', "{$user->full_name} no longer uploads gallery pictures.");
     }
 
     /**
@@ -127,28 +193,40 @@ class DepartmentContentController extends Controller
     {
         $this->authorizeFor($request, $department->id);
 
-        $request->validate([
-            'images' => ['required', 'array', 'min:1', 'max:'.self::MAX_UPLOADS],
-            'images.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
-        ], ['images.max' => 'Upload up to '.self::MAX_UPLOADS.' pictures at a time.']);
-
-        foreach ($request->file('images') as $file) {
-            $department->images()->create(['image' => PostImage::store($file, directory: 'gallery')]);
-        }
+        GalleryUploads::store($request, $department);
 
         return back()->with('success', 'Pictures added.');
     }
 
     /**
-     * Change a picture's caption.
+     * Change a picture's caption, or the service or event it is from.
      */
     public function updateImage(Request $request, DepartmentImage $image): RedirectResponse
     {
         $this->authorizeFor($request, $image->department_id);
 
+        if ($request->hasAny(['service_id', 'event_name'])) {
+            $image->update(GalleryUploads::validateOccasion($request, $image->department));
+
+            return back()->with('success', 'Picture moved.');
+        }
+
         $image->update($request->validate(['caption' => ['nullable', 'string', 'max:255']]));
 
         return back()->with('success', 'Caption saved.');
+    }
+
+    /**
+     * Move every picture of a service or event to another one, for when the
+     * wrong one was picked while uploading.
+     */
+    public function moveOccasion(Request $request, DepartmentImage $image): RedirectResponse
+    {
+        $this->authorizeFor($request, $image->department_id);
+
+        DepartmentImage::sameOccasionAs($image)->update(GalleryUploads::validateOccasion($request, $image->department));
+
+        return back()->with('success', 'Pictures moved.');
     }
 
     /**

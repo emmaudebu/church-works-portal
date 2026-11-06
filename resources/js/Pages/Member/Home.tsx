@@ -7,6 +7,7 @@ import { PageProps, PostCard as PostCardData } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import {
     CalendarCheck,
+    Camera,
     CalendarDays,
     IdCard,
     LucideIcon,
@@ -200,6 +201,33 @@ export default function Home({
                                 Vote now
                             </Link>
                         </section>
+                    )}
+
+                    {user.permissions.includes('upload_gallery') && (
+                        <Link
+                            href={route('gallery.upload')}
+                            className="card flex items-center gap-4 border-l-2 border-gold-500 p-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                        >
+                            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold-50 text-gold-500">
+                                <Camera
+                                    size={20}
+                                    strokeWidth={1.75}
+                                    aria-hidden="true"
+                                />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block font-medium">
+                                    Upload service photos
+                                </span>
+                                <span className="text-sm text-neutral-600">
+                                    Add pictures from a service or event to the
+                                    gallery
+                                </span>
+                            </span>
+                            <span className="text-sm font-semibold text-primary-700">
+                                Upload
+                            </span>
+                        </Link>
                     )}
 
                     <div className="grid gap-4 md:grid-cols-2">

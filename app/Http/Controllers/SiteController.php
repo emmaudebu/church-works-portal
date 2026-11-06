@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Department;
+use App\Models\DepartmentImage;
 use App\Models\Post;
 use App\Models\Service;
 use App\Models\User;
@@ -19,6 +20,11 @@ use Inertia\Response;
 class SiteController extends Controller
 {
     private const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+    /** How many of the latest pictures the department page shows. */
+    private const RECENT_PICTURES = 8;
+
+    private const OCCASIONS_PER_PAGE = 6;
 
     /**
      * Display the public homepage. Everything shown comes from live records.
@@ -100,7 +106,8 @@ class SiteController extends Controller
             'department' => [...$department->toCard(), 'image_url' => $department->bannerUrl()],
             'bestMember' => BestMembers::forDepartments(collect([$department->id]))->first()?->toPublicCard(),
             'units' => $department->units->pluck('name'),
-            'gallery' => $department->images->map->toCard(),
+            'gallery' => $department->images()->limit(self::RECENT_PICTURES)->get()->map->toCard(),
+            'galleryCount' => $department->images()->count(),
             'officers' => $officers->map(fn (User $user) => [
                 'id' => $user->id,
                 'full_name' => $user->full_name,
@@ -123,6 +130,35 @@ class SiteController extends Controller
             'others' => Department::single()
                 ? []
                 : Department::forDisplay()->whereKeyNot($department->id)->limit(3)->get()->map->toCard(),
+        ]);
+    }
+
+    /**
+     * Display a department's pictures grouped by the service or event they were
+     * taken at, newest first, a few groups at a time.
+     */
+    public function gallery(Department $department): Response
+    {
+        return Inertia::render('Site/Gallery', [
+            'department' => [
+                'name' => $department->name,
+                'slug' => $department->slug,
+                'image_url' => $department->bannerUrl(),
+            ],
+            'total' => $department->images()->count(),
+            'occasions' => Inertia::scroll(fn () => $department->images()
+                ->reorder()
+                ->occasions()
+                ->with('service')
+                ->paginate(self::OCCASIONS_PER_PAGE)
+                ->through(fn (DepartmentImage $occasion) => [
+                    ...$occasion->occasion(),
+                    'pictures_count' => $occasion->pictures_count,
+                    'pictures' => DepartmentImage::sameOccasionAs($occasion)
+                        ->oldest('id')
+                        ->get()
+                        ->map->toCard(),
+                ])),
         ]);
     }
 
