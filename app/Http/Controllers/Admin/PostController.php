@@ -7,13 +7,12 @@ use App\Http\Requests\Admin\PostRequest;
 use App\Models\Department;
 use App\Models\Post;
 use App\Support\CurrentDepartment;
-use App\Support\PostImage;
+use App\Support\MediaLibrary;
 use App\Support\PostNotifier;
 use App\Support\RichText;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -66,9 +65,7 @@ class PostController extends Controller
 
         $data = $this->attributes($request);
 
-        if ($request->hasFile('image')) {
-            $data['image'] = PostImage::store($request->file('image'));
-        }
+        $data['image'] = MediaLibrary::resolve($request, 'image');
 
         $post = Post::create([
             ...$data,
@@ -111,9 +108,7 @@ class PostController extends Controller
 
         $data = $this->attributes($request);
 
-        if ($request->hasFile('image')) {
-            $data['image'] = PostImage::store($request->file('image'), $post->image);
-        }
+        $data['image'] = MediaLibrary::resolve($request, 'image', $post->image);
 
         $wasPublished = $post->isPublished();
 
@@ -128,15 +123,11 @@ class PostController extends Controller
     }
 
     /**
-     * Delete a post and its cover image.
+     * Delete a post. Its cover picture stays in the media library.
      */
     public function destroy(Request $request, Post $post): RedirectResponse
     {
         $this->authorizeFor($request, $post);
-
-        if ($post->image) {
-            Storage::disk('public')->delete($post->image);
-        }
 
         $post->delete();
 
@@ -148,7 +139,7 @@ class PostController extends Controller
      */
     private function attributes(PostRequest $request): array
     {
-        $data = Arr::except($request->validated(), ['image', 'publish', 'notify']);
+        $data = Arr::except($request->validated(), ['image', 'image_media', 'publish', 'notify']);
 
         return [
             ...$data,

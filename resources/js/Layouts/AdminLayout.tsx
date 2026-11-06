@@ -1,6 +1,7 @@
 import { Dialog, DialogBackdrop, DialogPanel } from '@headlessui/react';
 import Avatar from '@/Components/Avatar';
 import Dropdown from '@/Components/Dropdown';
+import InstallPrompt from '@/Components/InstallPrompt';
 import Logo from '@/Components/Logo';
 import Toast from '@/Components/Toast';
 import { PageProps } from '@/types';
@@ -14,6 +15,7 @@ import {
     ChevronsRight,
     ClipboardList,
     ImagePlus,
+    Images,
     LayoutDashboard,
     LucideIcon,
     Menu,
@@ -34,6 +36,8 @@ const navItems: {
     icon: LucideIcon;
     superAdmin?: boolean;
     permission?: string;
+    /** Shown when the person has any one of these. */
+    anyPermission?: string[];
 }[] = [
     { label: 'Dashboard', route: 'admin.dashboard', icon: LayoutDashboard },
     { label: 'Members', route: 'admin.members', icon: Users },
@@ -84,6 +88,12 @@ const navItems: {
         route: 'gallery.upload',
         icon: ImagePlus,
         permission: 'upload_gallery',
+    },
+    {
+        label: 'Media Library',
+        route: 'admin.media',
+        icon: Images,
+        anyPermission: ['manage_department', 'manage_posts'],
     },
     {
         label: 'Departments',
@@ -141,7 +151,11 @@ function SidebarNav({
                     (item) =>
                         (!item.superAdmin || isSuperAdmin) &&
                         (!item.permission ||
-                            permissions.includes(item.permission)),
+                            permissions.includes(item.permission)) &&
+                        (!item.anyPermission ||
+                            item.anyPermission.some((permission) =>
+                                permissions.includes(permission),
+                            )),
                 ),
                 ...ownDepartment,
             ]
@@ -403,6 +417,7 @@ export default function AdminLayout({ children }: PropsWithChildren) {
                 </header>
 
                 <Toast />
+                <InstallPrompt />
 
                 <main className="flex-1 p-4 lg:p-8">{children}</main>
             </div>

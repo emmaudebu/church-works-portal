@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Department;
+use App\Models\Media;
 use App\Models\Post;
 use App\Models\User;
 use App\Notifications\PostPublished;
@@ -113,7 +114,7 @@ test('event fields are dropped when a post is not an event', function () {
         ->and(Post::first()->venue)->toBeNull();
 });
 
-test('a cover image is stored and removed with the post', function () {
+test('a cover image is stored and stays in the library when the post is deleted', function () {
     $this->actingAs($this->admin)->post(route('admin.posts.store'), [
         ...$this->payload, 'image' => UploadedFile::fake()->image('cover.png', 2400, 1200),
     ]);
@@ -124,8 +125,9 @@ test('a cover image is stored and removed with the post', function () {
 
     $this->actingAs($this->admin)->delete(route('admin.posts.destroy', $post));
 
-    Storage::disk('public')->assertMissing($post->image);
-    expect(Post::count())->toBe(0);
+    Storage::disk('public')->assertExists($post->image);
+    expect(Post::count())->toBe(0)
+        ->and(Media::where('path', $post->image)->exists())->toBeTrue();
 });
 
 test('saving without a new image keeps the existing one', function () {

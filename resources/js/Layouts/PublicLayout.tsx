@@ -1,3 +1,4 @@
+import InstallPrompt from '@/Components/InstallPrompt';
 import Logo from '@/Components/Logo';
 import SitePopup from '@/Components/Site/SitePopup';
 import VerseToast from '@/Components/Site/VerseToast';
@@ -144,6 +145,7 @@ export default function PublicLayout({
 
             {popup && <SitePopup popup={popup} />}
             {verseToast && <VerseToast toast={verseToast} />}
+            <InstallPrompt />
 
             <main key={url} className="flex-1 animate-page-in">
                 {children}

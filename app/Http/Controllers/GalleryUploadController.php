@@ -6,9 +6,9 @@ use App\Models\Department;
 use App\Models\DepartmentImage;
 use App\Support\CurrentDepartment;
 use App\Support\GalleryUploads;
+use App\Support\MediaLibrary;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -54,8 +54,9 @@ class GalleryUploadController extends Controller
     {
         abort_unless($image->uploaded_by === $request->user()->id && $image->department_id === $this->department($request)->id, 403);
 
-        Storage::disk('public')->delete($image->image);
         $image->delete();
+
+        MediaLibrary::discard($image->image);
 
         return back()->with('success', 'Picture removed.');
     }

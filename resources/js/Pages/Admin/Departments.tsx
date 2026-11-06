@@ -3,6 +3,7 @@ import DangerButton from '@/Components/DangerButton';
 import DepartmentIcon from '@/Components/DepartmentIcon';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import MediaField, { MediaChoice } from '@/Components/MediaField';
 import Modal from '@/Components/Modal';
 import OfficersPanel, { Officer, Person } from '@/Components/OfficersPanel';
 import PrimaryButton from '@/Components/PrimaryButton';
@@ -169,8 +170,11 @@ function DepartmentRow({
         about_title: string;
         about_accent: string;
         image: File | null;
+        image_media: number | null;
         about_image: File | null;
+        about_image_media: number | null;
         about_small_image: File | null;
+        about_small_image_media: number | null;
     }>({
         name: department.name,
         icon: department.icon ?? 'building',
@@ -180,9 +184,30 @@ function DepartmentRow({
         about_title: department.about_title ?? '',
         about_accent: department.about_accent ?? '',
         image: null,
+        image_media: null,
         about_image: null,
+        about_image_media: null,
         about_small_image: null,
+        about_small_image_media: null,
     });
+
+    const [previews, setPreviews] = useState({
+        image: department.image_url,
+        about_image: department.about_image_url,
+        about_small_image: department.about_small_image_url,
+    });
+
+    const pick = (
+        field: 'image' | 'about_image' | 'about_small_image',
+        choice: MediaChoice,
+    ) => {
+        page.setData({
+            ...page.data,
+            [field]: choice.file,
+            [`${field}_media`]: choice.mediaId,
+        });
+        setPreviews({ ...previews, [field]: choice.preview });
+    };
 
     const savePage: FormEventHandler = (e) => {
         e.preventDefault();
@@ -239,28 +264,14 @@ function DepartmentRow({
                 <h3 className="font-sans text-sm font-semibold">
                     Public page
                 </h3>
-                <div className="flex flex-wrap items-center gap-3">
-                    <img
-                        src={department.image_url}
-                        alt=""
-                        className="h-16 w-28 rounded-lg object-cover"
-                    />
-                    <label className="min-w-0 flex-1 basis-48 text-sm font-medium">
-                        Change banner picture
-                        <input
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            onChange={(e) =>
-                                page.setData(
-                                    'image',
-                                    e.target.files?.[0] ?? null,
-                                )
-                            }
-                            className="mt-1 block w-full text-sm font-normal"
-                        />
-                    </label>
-                </div>
-                <InputError message={page.errors.image} />
+                <MediaField
+                    id={`banner-${department.id}`}
+                    label="Banner picture"
+                    preview={previews.image}
+                    previewClassName="h-32 w-full"
+                    onChange={(choice) => pick('image', choice)}
+                    error={page.errors.image}
+                />
                 <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                         <InputLabel
@@ -333,34 +344,15 @@ function DepartmentRow({
                                 department.about_small_image_url,
                             ],
                         ] as const
-                    ).map(([field, label, current]) => (
-                        <div key={field}>
-                            <label className="block text-sm font-medium">
-                                {label}
-                                {current && (
-                                    <img
-                                        src={current}
-                                        alt=""
-                                        className="mt-1 h-28 w-full rounded-lg object-cover"
-                                    />
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/jpeg,image/png,image/webp"
-                                    onChange={(e) =>
-                                        page.setData(
-                                            field,
-                                            e.target.files?.[0] ?? null,
-                                        )
-                                    }
-                                    className="mt-1 block w-full text-sm font-normal"
-                                />
-                            </label>
-                            <InputError
-                                message={page.errors[field]}
-                                className="mt-2"
-                            />
-                        </div>
+                    ).map(([field, label]) => (
+                        <MediaField
+                            key={field}
+                            id={`${field}-${department.id}`}
+                            label={label}
+                            preview={previews[field]}
+                            onChange={(choice) => pick(field, choice)}
+                            error={page.errors[field]}
+                        />
                     ))}
                 </div>
                 <div className="grid gap-3 sm:grid-cols-3">

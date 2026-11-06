@@ -60,6 +60,15 @@ export interface HomeContent {
         image: string;
         small_image: string;
     };
+    units: {
+        eyebrow: string;
+        title: string;
+        accent: string;
+        text: string;
+        image: string | null;
+        overlay_color: string;
+        overlay_opacity: number;
+    };
     join: {
         eyebrow: string;
         title: string;

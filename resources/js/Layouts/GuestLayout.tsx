@@ -1,3 +1,4 @@
+import InstallPrompt from '@/Components/InstallPrompt';
 import Logo from '@/Components/Logo';
 import Embers from '@/Components/Site/Embers';
 import { PageProps } from '@/types';
@@ -40,6 +41,7 @@ export default function Guest({ children }: PropsWithChildren) {
                     {children}
                 </div>
             </main>
+            <InstallPrompt />
         </div>
     );
 }

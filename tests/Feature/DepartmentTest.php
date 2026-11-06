@@ -306,7 +306,7 @@ test('the about section can be changed and shows on the public page', function (
         ->where('department.about_small_image_url', Storage::disk('public')->url($department->about_small_image)));
 });
 
-test('a new about picture replaces only its own upload', function () {
+test('a new about picture replaces only its own, and the old one stays in the library', function () {
     Storage::fake('public');
 
     $head = User::factory()->create(['department_id' => $this->technical->id])->assignRole('dept_admin');
@@ -319,11 +319,12 @@ test('a new about picture replaces only its own upload', function () {
         'about_image' => UploadedFile::fake()->image('new.jpg'),
     ])->assertSessionHasNoErrors();
 
-    Storage::disk('public')->assertMissing($this->technical->about_image);
-    Storage::disk('public')->assertExists([$this->technical->fresh()->about_image, $this->technical->about_small_image]);
+    expect($this->technical->fresh()->about_image)->not->toBe($this->technical->about_image)
+        ->and($this->technical->fresh()->about_small_image)->toBe($this->technical->about_small_image);
+    Storage::disk('public')->assertExists([$this->technical->about_image, $this->technical->fresh()->about_image, $this->technical->about_small_image]);
 });
 
-test('deleting a department removes its about pictures', function () {
+test('deleting a department leaves its pictures in the media library', function () {
     Storage::fake('public');
 
     $choir = Department::firstWhere('slug', 'choir');
@@ -331,7 +332,7 @@ test('deleting a department removes its about pictures', function () {
 
     $this->actingAs($this->superAdmin)->delete(route('admin.departments.destroy', $choir))->assertSessionHasNoErrors();
 
-    Storage::disk('public')->assertMissing($choir->about_image);
+    Storage::disk('public')->assertExists($choir->about_image);
 });
 
 test('only pictures are accepted for the about section', function () {

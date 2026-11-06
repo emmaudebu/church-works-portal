@@ -1,6 +1,7 @@
 import DangerButton from '@/Components/DangerButton';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import MediaField, { MediaChoice } from '@/Components/MediaField';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SitePopup from '@/Components/Site/SitePopup';
 import VerseToast from '@/Components/Site/VerseToast';
@@ -428,49 +429,14 @@ type SlideForm = Omit<HomeSlide, 'id' | 'image'> & {
     id: string | null;
     preview: string | null;
     image: File | null;
+    image_media: number | null;
 };
 
 type JoinStepForm = Omit<JoinStep, 'image'> & {
     preview: string;
     image: File | null;
+    image_media: number | null;
 };
-
-function ImagePicker({
-    id,
-    label,
-    preview,
-    onChange,
-    error,
-}: {
-    id: string;
-    label: string;
-    preview: string | null;
-    onChange: (file: File | null) => void;
-    error?: string;
-}) {
-    return (
-        <div>
-            <label htmlFor={id} className="block text-sm font-medium">
-                {label}
-            </label>
-            {preview && (
-                <img
-                    src={preview}
-                    alt=""
-                    className="mt-1 h-28 w-full rounded-lg object-cover"
-                />
-            )}
-            <input
-                id={id}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-                className="mt-1 block w-full text-sm"
-            />
-            <InputError message={error} className="mt-2" />
-        </div>
-    );
-}
 
 function HomepageForm({ home }: { home: HomeContent }) {
     const [previews, setPreviews] = useState<Record<string, string>>({});
@@ -479,7 +445,14 @@ function HomepageForm({ home }: { home: HomeContent }) {
         slides: SlideForm[];
         welcome: Omit<HomeContent['welcome'], 'image' | 'small_image'> & {
             image: File | null;
+            image_media: number | null;
             small_image: File | null;
+            small_image_media: number | null;
+        };
+        units: Omit<HomeContent['units'], 'image'> & {
+            image: File | null;
+            image_media: number | null;
+            remove_image: boolean;
         };
         join: Omit<HomeContent['join'], 'steps'> & { steps: JoinStepForm[] };
     }>({
@@ -487,14 +460,28 @@ function HomepageForm({ home }: { home: HomeContent }) {
             ...slide,
             preview: slide.image,
             image: null,
+            image_media: null,
         })),
-        welcome: { ...home.welcome, image: null, small_image: null },
+        welcome: {
+            ...home.welcome,
+            image: null,
+            image_media: null,
+            small_image: null,
+            small_image_media: null,
+        },
+        units: {
+            ...home.units,
+            image: null,
+            image_media: null,
+            remove_image: false,
+        },
         join: {
             ...home.join,
             steps: home.join.steps.map((step) => ({
                 ...step,
                 preview: step.image,
                 image: null,
+                image_media: null,
             })),
         },
     });
@@ -513,17 +500,16 @@ function HomepageForm({ home }: { home: HomeContent }) {
             ),
         );
 
-    const pickSlide = (index: number, file: File | null) =>
+    const pickSlide = (index: number, choice: MediaChoice) =>
         form.setData(
             'slides',
             form.data.slides.map((slide, position) =>
                 position === index
                     ? {
                           ...slide,
-                          image: file,
-                          preview: file
-                              ? URL.createObjectURL(file)
-                              : slide.preview,
+                          image: choice.file,
+                          image_media: choice.mediaId,
+                          preview: choice.preview,
                       }
                     : slide,
             ),
@@ -536,14 +522,22 @@ function HomepageForm({ home }: { home: HomeContent }) {
 
     const pickWelcome = (
         field: 'image' | 'small_image',
-        file: File | null,
+        choice: MediaChoice,
     ) => {
-        changeWelcome(field, file);
-        setPreviews({
-            ...previews,
-            ...(file ? { [field]: URL.createObjectURL(file) } : {}),
+        form.setData('welcome', {
+            ...form.data.welcome,
+            [field]: choice.file,
+            [`${field}_media`]: choice.mediaId,
         });
+        setPreviews({ ...previews, [field]: choice.preview ?? '' });
     };
+
+    const changeUnits = (changes: Partial<typeof form.data.units>) =>
+        form.setData('units', { ...form.data.units, ...changes });
+
+    const unitsPreview = form.data.units.remove_image
+        ? null
+        : (previews.units_image ?? home.units.image);
 
     const changeJoin = (
         field: 'eyebrow' | 'title' | 'accent' | 'text',
@@ -565,6 +559,7 @@ function HomepageForm({ home }: { home: HomeContent }) {
                 id: null,
                 preview: null,
                 image: null,
+                image_media: null,
                 label: '',
                 title: '',
                 accent: '',
@@ -620,7 +615,7 @@ function HomepageForm({ home }: { home: HomeContent }) {
     return (
         <Panel
             title="Homepage"
-            description="Change the slider, the welcome section and the join the team section. The Next event and Latest news card fills in by itself from your posts."
+            description="Change the slider, the welcome section, the units section and the join the team section. The Next event and Latest news card fills in by itself from your posts."
         >
             <form onSubmit={submit} className="space-y-6">
                 <section>
@@ -636,12 +631,17 @@ function HomepageForm({ home }: { home: HomeContent }) {
                                 <legend className="sr-only">
                                     Slide {index + 1}
                                 </legend>
-                                <ImagePicker
+                                <MediaField
                                     id={`slide-${index}-image`}
                                     label={`Slide ${index + 1} picture`}
                                     preview={slide.preview}
-                                    onChange={(file) => pickSlide(index, file)}
-                                    error={errors[`slides.${index}.image`]}
+                                    onChange={(choice) =>
+                                        pickSlide(index, choice)
+                                    }
+                                    error={
+                                        errors[`slides.${index}.image`] ??
+                                        errors[`slides.${index}.image_media`]
+                                    }
                                 />
                                 <div className="space-y-3">
                                     {text(
@@ -711,22 +711,22 @@ function HomepageForm({ home }: { home: HomeContent }) {
                         Welcome section
                     </h3>
                     <div className="grid gap-3 sm:grid-cols-2">
-                        <ImagePicker
+                        <MediaField
                             id="welcome-image"
                             label="Main arched picture"
                             preview={previews.image ?? home.welcome.image}
-                            onChange={(file) => pickWelcome('image', file)}
+                            onChange={(choice) => pickWelcome('image', choice)}
                             error={errors['welcome.image']}
                         />
-                        <ImagePicker
+                        <MediaField
                             id="welcome-small-image"
                             label="Small round picture"
                             preview={
                                 previews.small_image ??
                                 home.welcome.small_image
                             }
-                            onChange={(file) =>
-                                pickWelcome('small_image', file)
+                            onChange={(choice) =>
+                                pickWelcome('small_image', choice)
                             }
                             error={errors['welcome.small_image']}
                         />
@@ -788,6 +788,188 @@ function HomepageForm({ home }: { home: HomeContent }) {
 
                 <section className="space-y-3 border-t border-neutral-200 pt-4">
                     <h3 className="font-sans text-sm font-semibold">
+                        Units section ("Behind every service")
+                    </h3>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <MediaField
+                                id="units-image"
+                                label="Background picture (optional)"
+                                preview={unitsPreview}
+                                onChange={(choice) => {
+                                    changeUnits({
+                                        image: choice.file,
+                                        image_media: choice.mediaId,
+                                        remove_image: false,
+                                    });
+                                    setPreviews({
+                                        ...previews,
+                                        units_image: choice.preview ?? '',
+                                    });
+                                }}
+                                error={errors['units.image']}
+                            />
+                            {unitsPreview && (
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        changeUnits({
+                                            image: null,
+                                            image_media: null,
+                                            remove_image: true,
+                                        })
+                                    }
+                                    className="mt-2 text-sm text-danger underline focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
+                                >
+                                    Remove picture
+                                </button>
+                            )}
+                        </div>
+                        <div className="space-y-3">
+                            <div>
+                                <InputLabel
+                                    htmlFor="units-overlay-color"
+                                    value="Overlay colour"
+                                />
+                                <div className="mt-1 flex items-center gap-3">
+                                    <input
+                                        id="units-overlay-color"
+                                        type="color"
+                                        value={form.data.units.overlay_color}
+                                        onChange={(e) =>
+                                            changeUnits({
+                                                overlay_color:
+                                                    e.target.value.toUpperCase(),
+                                            })
+                                        }
+                                        className="h-10 w-14 cursor-pointer rounded-lg border border-neutral-200"
+                                    />
+                                    <span className="font-mono text-sm text-neutral-600">
+                                        {form.data.units.overlay_color}
+                                    </span>
+                                </div>
+                                <InputError
+                                    message={errors['units.overlay_color']}
+                                    className="mt-2"
+                                />
+                            </div>
+                            <div>
+                                <InputLabel
+                                    htmlFor="units-overlay-opacity"
+                                    value={`Overlay opacity: ${form.data.units.overlay_opacity}%`}
+                                />
+                                <input
+                                    id="units-overlay-opacity"
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    step={5}
+                                    value={form.data.units.overlay_opacity}
+                                    onChange={(e) =>
+                                        changeUnits({
+                                            overlay_opacity: Number(
+                                                e.target.value,
+                                            ),
+                                        })
+                                    }
+                                    className="mt-2 block w-full accent-primary-700"
+                                />
+                                <p className="mt-1 text-xs text-neutral-600">
+                                    0% shows the picture as it is; 100% covers
+                                    it completely.
+                                </p>
+                                {unitsPreview &&
+                                    form.data.units.overlay_opacity < 40 && (
+                                        <p className="mt-1 text-xs text-warning">
+                                            The text may be hard to read on a
+                                            busy picture. Check the preview
+                                            below.
+                                        </p>
+                                    )}
+                                <InputError
+                                    message={errors['units.overlay_opacity']}
+                                    className="mt-2"
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div
+                        aria-hidden="true"
+                        className="relative overflow-hidden rounded-lg px-5 py-6 text-white"
+                        style={{
+                            backgroundColor: form.data.units.overlay_color,
+                        }}
+                    >
+                        {unitsPreview && (
+                            <>
+                                <img
+                                    src={unitsPreview}
+                                    alt=""
+                                    className="absolute inset-0 h-full w-full object-cover"
+                                />
+                                <div
+                                    className="absolute inset-0"
+                                    style={{
+                                        backgroundColor:
+                                            form.data.units.overlay_color,
+                                        opacity:
+                                            form.data.units.overlay_opacity /
+                                            100,
+                                    }}
+                                />
+                            </>
+                        )}
+                        <div className="relative">
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-gold-300">
+                                {form.data.units.eyebrow}
+                            </p>
+                            <p className="mt-1 font-serif text-2xl">
+                                {form.data.units.title}{' '}
+                                <em className="text-gold-300">
+                                    {form.data.units.accent}
+                                </em>
+                            </p>
+                            <p className="mt-2 text-sm text-silver-300">
+                                {form.data.units.text}
+                            </p>
+                        </div>
+                    </div>
+
+                    {text(
+                        'units-eyebrow',
+                        'Small label',
+                        form.data.units.eyebrow,
+                        (value) => changeUnits({ eyebrow: value }),
+                        errors['units.eyebrow'],
+                    )}
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        {text(
+                            'units-title',
+                            'Heading',
+                            form.data.units.title,
+                            (value) => changeUnits({ title: value }),
+                            errors['units.title'],
+                        )}
+                        {text(
+                            'units-accent',
+                            'Gold italic words',
+                            form.data.units.accent,
+                            (value) => changeUnits({ accent: value }),
+                            errors['units.accent'],
+                        )}
+                    </div>
+                    {text(
+                        'units-text',
+                        'Sentence under the heading',
+                        form.data.units.text,
+                        (value) => changeUnits({ text: value }),
+                        errors['units.text'],
+                    )}
+                </section>
+
+                <section className="space-y-3 border-t border-neutral-200 pt-4">
+                    <h3 className="font-sans text-sm font-semibold">
                         Join the team section
                     </h3>
                     {text(
@@ -828,16 +1010,15 @@ function HomepageForm({ home }: { home: HomeContent }) {
                             <legend className="sr-only">
                                 Step {index + 1}
                             </legend>
-                            <ImagePicker
+                            <MediaField
                                 id={`join-step-${index}-image`}
                                 label={`Step ${index + 1} picture`}
                                 preview={step.preview}
-                                onChange={(file) =>
+                                onChange={(choice) =>
                                     changeStep(index, {
-                                        image: file,
-                                        preview: file
-                                            ? URL.createObjectURL(file)
-                                            : step.preview,
+                                        image: choice.file,
+                                        image_media: choice.mediaId,
+                                        preview: choice.preview ?? step.preview,
                                     })
                                 }
                                 error={errors[`join.steps.${index}.image`]}
@@ -999,6 +1180,7 @@ function PopupForm({ popup }: { popup: SitePopupData }) {
     const form = useForm<{
         enabled: boolean;
         image: File | null;
+        image_media: number | null;
         link: string;
         alt: string;
         frequency: string;
@@ -1010,6 +1192,7 @@ function PopupForm({ popup }: { popup: SitePopupData }) {
     }>({
         enabled: popup.enabled,
         image: null,
+        image_media: null,
         link: popup.link ?? '',
         alt: popup.alt,
         frequency: popup.frequency,
@@ -1030,7 +1213,7 @@ function PopupForm({ popup }: { popup: SitePopupData }) {
             forceFormData: true,
             preserveScroll: true,
             onSuccess: () => {
-                form.reset('image', 'reset_views', 'reset_image');
+                form.reset('image', 'image_media', 'reset_views', 'reset_image');
                 setChosen(null);
             },
         });
@@ -1055,34 +1238,22 @@ function PopupForm({ popup }: { popup: SitePopupData }) {
                     Show the pop-up
                 </label>
 
-                <div>
-                    <label
-                        htmlFor="popup_image"
-                        className="block text-sm font-medium"
-                    >
-                        Image
-                    </label>
-                    <div className="mt-2 flex h-44 items-center justify-center rounded-lg bg-charcoal-900 p-2">
-                        <img
-                            src={chosen ?? popup.image_url}
-                            alt=""
-                            className="max-h-full"
-                        />
-                    </div>
-                    <input
-                        id="popup_image"
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => {
-                            const file = e.target.files?.[0] ?? null;
-
-                            form.setData('image', file);
-                            setChosen(file ? URL.createObjectURL(file) : null);
-                        }}
-                        className="mt-2 block w-full text-sm"
-                    />
-                    <InputError message={form.errors.image} className="mt-2" />
-                </div>
+                <MediaField
+                    id="popup_image"
+                    label="Image"
+                    preview={chosen ?? popup.image_url}
+                    previewClassName="h-44 w-full"
+                    contain
+                    onChange={(choice) => {
+                        form.setData({
+                            ...form.data,
+                            image: choice.file,
+                            image_media: choice.mediaId,
+                        });
+                        setChosen(choice.preview);
+                    }}
+                    error={form.errors.image}
+                />
 
                 <div>
                     <InputLabel

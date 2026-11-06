@@ -288,22 +288,46 @@ export default function Welcome({
             </section>
 
             {singleDepartment && units.length > 0 && (
-                <section className="bg-charcoal-900 py-20 text-white">
-                    <div className="mx-auto max-w-7xl px-4 md:px-8">
+                <section
+                    className="relative overflow-hidden py-20 text-white"
+                    style={{ backgroundColor: home.units.overlay_color }}
+                >
+                    {home.units.image && (
+                        <>
+                            <img
+                                src={home.units.image}
+                                alt=""
+                                loading="lazy"
+                                className="absolute inset-0 h-full w-full object-cover"
+                            />
+                            <div
+                                aria-hidden="true"
+                                className="absolute inset-0"
+                                style={{
+                                    backgroundColor: home.units.overlay_color,
+                                    opacity: home.units.overlay_opacity / 100,
+                                }}
+                            />
+                        </>
+                    )}
+                    <div className="relative mx-auto max-w-7xl px-4 md:px-8">
                         <div className="reveal mb-10 max-w-2xl">
-                            <p className="eyebrow text-gold-300">
-                                Behind every service
-                            </p>
+                            {home.units.eyebrow && (
+                                <p className="eyebrow text-gold-300">
+                                    {home.units.eyebrow}
+                                </p>
+                            )}
                             <h2 className="mt-2 text-4xl leading-tight text-white">
-                                Our{' '}
+                                {home.units.title}{' '}
                                 <em className="font-medium text-gold-300">
-                                    Technical Units
+                                    {home.units.accent}
                                 </em>
                             </h2>
-                            <p className="mt-4 text-silver-300">
-                                Each unit has its own work. Together they keep
-                                every service heard, seen and running well.
-                            </p>
+                            {home.units.text && (
+                                <p className="mt-4 text-silver-300">
+                                    {home.units.text}
+                                </p>
+                            )}
                         </div>
                         <UnitGrid units={units} />
                     </div>

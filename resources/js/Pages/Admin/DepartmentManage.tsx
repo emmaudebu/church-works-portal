@@ -8,6 +8,7 @@ import GalleryUploadForm, {
 } from '@/Components/GalleryUploadForm';
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import MediaField from '@/Components/MediaField';
 import OfficersPanel, { Officer, Person } from '@/Components/OfficersPanel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
@@ -181,10 +182,12 @@ function PageForm({ department }: { department: PageContent }) {
         description: string;
         about: string;
         image: File | null;
+        image_media: number | null;
     }>({
         description: department.description ?? '',
         about: department.about ?? '',
         image: null,
+        image_media: null,
     });
 
     const submit: FormEventHandler = (e) => {
@@ -193,7 +196,7 @@ function PageForm({ department }: { department: PageContent }) {
         form.post(route('admin.departments.page', department.id), {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => form.setData('image', null),
+            onSuccess: () => form.setData({ ...form.data, image: null, image_media: null }),
         });
     };
 
@@ -205,35 +208,24 @@ function PageForm({ department }: { department: PageContent }) {
             </p>
 
             <form onSubmit={submit} className="mt-4 space-y-4">
-                <div>
-                    <label
-                        htmlFor="page-image"
-                        className="block text-sm font-medium"
-                    >
-                        Banner picture
-                    </label>
-                    <img
-                        src={preview}
-                        alt=""
-                        className="mt-1 h-40 w-full rounded-lg object-cover"
-                    />
-                    <input
-                        id="page-image"
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={(e) => {
-                            const file = e.target.files?.[0] ?? null;
+                <MediaField
+                    id="page-image"
+                    label="Banner picture"
+                    preview={preview}
+                    previewClassName="h-40 w-full"
+                    onChange={(choice) => {
+                        form.setData({
+                            ...form.data,
+                            image: choice.file,
+                            image_media: choice.mediaId,
+                        });
 
-                            form.setData('image', file);
-
-                            if (file) {
-                                setPreview(URL.createObjectURL(file));
-                            }
-                        }}
-                        className="mt-2 block w-full text-sm"
-                    />
-                    <InputError message={form.errors.image} className="mt-2" />
-                </div>
+                        if (choice.preview) {
+                            setPreview(choice.preview);
+                        }
+                    }}
+                    error={form.errors.image}
+                />
 
                 <div>
                     <InputLabel
