@@ -125,6 +125,15 @@ class Settings
             'image' => '/images/site/cross.jpg',
             'small_image' => '/images/site/surrender.jpg',
         ],
+        'units' => [
+            'eyebrow' => 'Behind every service',
+            'title' => 'Our',
+            'accent' => 'Technical Units',
+            'text' => 'Each unit has its own work. Together they keep every service heard, seen and running well.',
+            'image' => null,
+            'overlay_color' => '#1A1A1A',
+            'overlay_opacity' => 80,
+        ],
         'join' => [
             'eyebrow' => 'Join the team',
             'title' => 'Your Place',
@@ -286,7 +295,7 @@ class Settings
     }
 
     /**
-     * @return array{slides: array<int, array<string, string>>, welcome: array<string, string>, join: array<string, mixed>}
+     * @return array{slides: array<int, array<string, string>>, welcome: array<string, string>, units: array<string, mixed>, join: array<string, mixed>}
      */
     public static function home(): array
     {
@@ -311,6 +320,10 @@ class Settings
                 ...$home['welcome'],
                 'image' => self::imageUrl($home['welcome']['image']),
                 'small_image' => self::imageUrl($home['welcome']['small_image']),
+            ],
+            'units' => [
+                ...$home['units'],
+                'image' => $home['units']['image'] ? self::imageUrl($home['units']['image']) : null,
             ],
             'join' => [
                 ...$home['join'],

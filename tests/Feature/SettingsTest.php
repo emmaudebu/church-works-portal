@@ -252,6 +252,14 @@ function homeSettings(array $overrides = []): array
             'button_label' => 'Go',
             'button_link' => '/news',
         ],
+        'units' => [
+            'eyebrow' => 'Behind the scenes',
+            'title' => 'Our',
+            'accent' => 'Units',
+            'text' => 'Units sentence',
+            'overlay_color' => '#1A1A1A',
+            'overlay_opacity' => 80,
+        ],
         'join' => [
             'eyebrow' => 'Come along',
             'title' => 'New join heading',
@@ -288,7 +296,64 @@ test('hero text and the welcome section can be changed', function () {
         ->where('home.welcome.button_link', '/news'));
 });
 
-test('hero and welcome images can be uploaded and old uploads are removed', function () {
+test('the units section starts plain and its text can be changed', function () {
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('home.units.image', null)
+        ->where('home.units.eyebrow', 'Behind every service'));
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), homeSettings())
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('home.units.eyebrow', 'Behind the scenes')
+        ->where('home.units.accent', 'Units')
+        ->where('home.units.overlay_opacity', 80));
+});
+
+test('the units section takes a background picture and overlay, and the picture can be removed', function () {
+    Storage::fake('public');
+
+    $data = homeSettings();
+    $data['units']['image'] = UploadedFile::fake()->image('desk.jpg', 1600, 900);
+    $data['units']['overlay_color'] = '#5a0f0f';
+    $data['units']['overlay_opacity'] = 65;
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data)
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    $units = Settings::home()['units'];
+
+    Storage::disk('public')->assertExists($units['image']);
+    expect($units['overlay_color'])->toBe('#5A0F0F')
+        ->and($units['overlay_opacity'])->toBe(65);
+
+    $this->get('/')->assertInertia(fn (Assert $page) => $page
+        ->where('home.units.image', Storage::disk('public')->url($units['image'])));
+
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), homeSettings(['units' => [...homeSettings()['units'], 'remove_image' => true]]))
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Settings::home()['units']['image'])->toBeNull();
+    Storage::disk('public')->assertExists($units['image']);
+});
+
+test('the units overlay needs a dark colour and an opacity from 0 to 100', function (array $overlay, string $error) {
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), homeSettings(['units' => [...homeSettings()['units'], ...$overlay]]))
+        ->assertSessionHasErrors($error);
+})->with([
+    'a light colour' => [['overlay_color' => '#F5F5F5'], 'units.overlay_color'],
+    'over 100' => [['overlay_opacity' => 120], 'units.overlay_opacity'],
+    'below 0' => [['overlay_opacity' => -5], 'units.overlay_opacity'],
+]);
+
+test('the units overlay can be turned right down', function () {
+    $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), homeSettings(['units' => [...homeSettings()['units'], 'overlay_opacity' => 0]]))
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Settings::home()['units']['overlay_opacity'])->toBe(0);
+});
+
+test('hero and welcome images can be uploaded and replaced ones stay in the library', function () {
     $data = homeSettings();
     $data['slides'][0]['image'] = UploadedFile::fake()->image('hero.jpg', 2000, 1000);
     $data['welcome']['image'] = UploadedFile::fake()->image('arch.jpg', 800, 1000);
@@ -305,8 +370,8 @@ test('hero and welcome images can be uploaded and old uploads are removed', func
 
     $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data);
 
-    Storage::disk('public')->assertMissing($home['slides'][0]['image']);
-    Storage::disk('public')->assertExists($home['welcome']['image']);
+    expect(Settings::home()['slides'][0]['image'])->not->toBe($home['slides'][0]['image']);
+    Storage::disk('public')->assertExists([$home['slides'][0]['image'], $home['welcome']['image']]);
 });
 
 test('the join the team section can be changed and keeps its pictures', function () {
@@ -323,7 +388,7 @@ test('the join the team section can be changed and keeps its pictures', function
         ->where('home.join.steps.1.image', '/images/site/auditorium.jpg'));
 });
 
-test('a join step picture can be replaced and the old upload is removed', function () {
+test('a join step picture can be replaced and the old one stays in the library', function () {
     $data = homeSettings();
     $data['join']['steps'][0]['image'] = UploadedFile::fake()->image('first.jpg', 800, 600);
     $data['join']['steps'][2]['image'] = UploadedFile::fake()->image('third.jpg', 800, 600);
@@ -339,8 +404,8 @@ test('a join step picture can be replaced and the old upload is removed', functi
 
     $this->actingAs($this->superAdmin)->post(route('admin.settings.home'), $data)->assertSessionHasNoErrors();
 
-    Storage::disk('public')->assertMissing($steps[0]['image']);
-    Storage::disk('public')->assertExists($steps[2]['image']);
+    expect(Settings::home()['join']['steps'][0]['image'])->not->toBe($steps[0]['image']);
+    Storage::disk('public')->assertExists([$steps[0]['image'], $steps[2]['image']]);
 });
 
 test('a homepage saved before the join section existed still shows it', function () {
@@ -527,7 +592,9 @@ test('uploading a new image replaces the old one and shows it to everyone again'
         'image' => UploadedFile::fake()->image('two.png'),
     ]));
 
-    Storage::disk('public')->assertMissing($first['image']);
+    expect(Settings::popup()['image'])->not->toBe($first['image'])
+        ->and(Settings::popup()['version'])->toBe(3);
+    Storage::disk('public')->assertExists($first['image']);
 });
 
 test('saving without a new image keeps the current one and the view counts', function () {

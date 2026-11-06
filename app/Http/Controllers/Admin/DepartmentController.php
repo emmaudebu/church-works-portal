@@ -7,11 +7,10 @@ use App\Models\Candidate;
 use App\Models\Department;
 use App\Models\Due;
 use App\Models\Payment;
-use App\Models\Post;
 use App\Models\User;
 use App\Support\CurrentDepartment;
+use App\Support\MediaLibrary;
 use App\Support\Offices;
-use App\Support\PostImage;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -80,7 +79,8 @@ class DepartmentController extends Controller
     /**
      * Delete a department and everything that belongs to it. One still in use
      * must be confirmed by typing its name. Members keep their accounts and join
-     * no department, and payment records are kept as financial history.
+     * no department, payment records are kept as financial history, and its
+     * pictures stay in the media library.
      */
     public function destroy(Request $request, Department $department): RedirectResponse
     {
@@ -90,11 +90,6 @@ class DepartmentController extends Controller
                 ['confirm_name.*' => 'Type the department name exactly to delete it.'],
             );
         }
-
-        $publicFiles = $department->images()->pluck('image')
-            ->push($department->image, $department->about_image, $department->about_small_image)
-            ->merge(Post::where('department_id', $department->id)->pluck('image'))
-            ->filter();
 
         $candidatePhotos = Candidate::whereHas('position.election', fn ($elections) => $elections->where('department_id', $department->id))
             ->pluck('photo')
@@ -116,7 +111,6 @@ class DepartmentController extends Controller
             $department->delete();
         });
 
-        Storage::disk('public')->delete($publicFiles->all());
         Storage::disk('local')->delete($candidatePhotos->all());
 
         return to_route('admin.departments')->with('success', 'Department deleted.');
@@ -178,17 +172,16 @@ class DepartmentController extends Controller
             'image' => $picture,
             'about_image' => $picture,
             'about_small_image' => $picture,
+            ...MediaLibrary::rules('image', 'about_image', 'about_small_image'),
         ]);
 
         $pictures = collect(['image', 'about_image', 'about_small_image'])
             ->mapWithKeys(fn (string $field) => [
-                $field => $request->hasFile($field)
-                    ? PostImage::store($request->file($field), $department->{$field})
-                    : $department->{$field},
+                $field => MediaLibrary::resolve($request, $field, $department->{$field}),
             ]);
 
         $department->update([
-            ...Arr::except($validated, $pictures->keys()->all()),
+            ...Arr::except($validated, [...$pictures->keys()->all(), 'image_media', 'about_image_media', 'about_small_image_media']),
             ...$pictures,
         ]);
 

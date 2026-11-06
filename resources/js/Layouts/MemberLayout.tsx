@@ -1,4 +1,5 @@
 import Avatar from '@/Components/Avatar';
+import InstallPrompt from '@/Components/InstallPrompt';
 import Logo from '@/Components/Logo';
 import VerseToast from '@/Components/Site/VerseToast';
 import Toast from '@/Components/Toast';
@@ -157,6 +158,7 @@ export default function MemberLayout({
 
                 <Toast />
                 {verseToast && <VerseToast toast={verseToast} raised />}
+                <InstallPrompt raised />
 
                 <main className={`mx-auto px-4 py-6 lg:px-8 ${width}`}>
                     {children}

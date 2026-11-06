@@ -5,9 +5,9 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Service;
 use App\Models\User;
+use App\Support\MediaLibrary;
 use App\Support\Offices;
 use App\Support\Paystack;
-use App\Support\PostImage;
 use App\Support\ServiceGenerator;
 use App\Support\Settings;
 use Closure;
@@ -189,6 +189,21 @@ class SettingsController extends Controller
             'welcome.button_link' => ['required', 'string', 'max:500', $this->safeLink()],
             'welcome.image' => $picture,
             'welcome.small_image' => $picture,
+            'units.eyebrow' => ['nullable', 'string', 'max:50'],
+            'units.title' => ['required', 'string', 'max:100'],
+            'units.accent' => ['nullable', 'string', 'max:60'],
+            'units.text' => ['nullable', 'string', 'max:300'],
+            'units.image' => $picture,
+            'units.remove_image' => ['nullable', 'boolean'],
+            'units.overlay_color' => [
+                'required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/',
+                function (string $attribute, mixed $value, Closure $fail) {
+                    if (preg_match('/^#[0-9a-fA-F]{6}$/', (string) $value) && Settings::contrast($value, '#FFFFFF') < self::MINIMUM_TEXT_CONTRAST) {
+                        $fail('This colour is too light for the white text on top of it.');
+                    }
+                },
+            ],
+            'units.overlay_opacity' => ['required', 'integer', 'min:0', 'max:100'],
             'join.eyebrow' => ['nullable', 'string', 'max:50'],
             'join.title' => ['required', 'string', 'max:100'],
             'join.accent' => ['nullable', 'string', 'max:60'],
@@ -197,13 +212,14 @@ class SettingsController extends Controller
             'join.steps.*.title' => ['required', 'string', 'max:80'],
             'join.steps.*.text' => ['required', 'string', 'max:300'],
             'join.steps.*.image' => $picture,
+            ...MediaLibrary::rules('slides.*.image', 'welcome.image', 'welcome.small_image', 'units.image', 'join.steps.*.image'),
         ]);
 
         $current = Settings::home();
         $existing = collect($current['slides'])->keyBy('id');
 
         foreach ($validated['slides'] as $index => $slide) {
-            if (! $request->hasFile("slides.{$index}.image") && ! $existing->has($slide['id'] ?? '')) {
+            if (! MediaLibrary::chosen($request, "slides.{$index}.image") && ! $existing->has($slide['id'] ?? '')) {
                 throw ValidationException::withMessages(["slides.{$index}.image" => 'Please choose a picture for this slide.']);
             }
         }
@@ -213,17 +229,24 @@ class SettingsController extends Controller
 
             return [
                 'id' => $old['id'] ?? Str::random(12),
-                'image' => $request->hasFile("slides.{$index}.image")
-                    ? PostImage::store($request->file("slides.{$index}.image"))
-                    : $old['image'],
+                'image' => MediaLibrary::resolve($request, "slides.{$index}.image", $old['image'] ?? null),
                 ...collect($slide)->only(['label', 'title', 'accent', 'text'])->map(fn ($value) => $value ?? '')->all(),
             ];
         })->values()->all();
 
         $welcome = [
-            ...collect($validated['welcome'])->except(['image', 'small_image'])->map(fn ($value) => $value ?? '')->all(),
-            'image' => $request->hasFile('welcome.image') ? PostImage::store($request->file('welcome.image')) : $current['welcome']['image'],
-            'small_image' => $request->hasFile('welcome.small_image') ? PostImage::store($request->file('welcome.small_image')) : $current['welcome']['small_image'],
+            ...collect($validated['welcome'])->except(['image', 'small_image', 'image_media', 'small_image_media'])->map(fn ($value) => $value ?? '')->all(),
+            'image' => MediaLibrary::resolve($request, 'welcome.image', $current['welcome']['image']),
+            'small_image' => MediaLibrary::resolve($request, 'welcome.small_image', $current['welcome']['small_image']),
+        ];
+
+        $units = [
+            ...collect($validated['units'])->only(['eyebrow', 'title', 'accent', 'text'])->map(fn ($value) => $value ?? '')->all(),
+            'image' => MediaLibrary::chosen($request, 'units.image') || ! $request->boolean('units.remove_image')
+                ? MediaLibrary::resolve($request, 'units.image', $current['units']['image'])
+                : null,
+            'overlay_color' => strtoupper($validated['units']['overlay_color']),
+            'overlay_opacity' => (int) $validated['units']['overlay_opacity'],
         ];
 
         $join = [
@@ -231,17 +254,13 @@ class SettingsController extends Controller
             'steps' => collect($validated['join']['steps'])->map(fn (array $step, int $index) => [
                 'title' => $step['title'],
                 'text' => $step['text'],
-                'image' => $request->hasFile("join.steps.{$index}.image")
-                    ? PostImage::store($request->file("join.steps.{$index}.image"))
-                    : $current['join']['steps'][$index]['image'],
+                'image' => MediaLibrary::resolve($request, "join.steps.{$index}.image", $current['join']['steps'][$index]['image']),
             ])->values()->all(),
         ];
 
-        $home = ['slides' => $slides, 'welcome' => $welcome, 'join' => $join];
+        $home = ['slides' => $slides, 'welcome' => $welcome, 'units' => $units, 'join' => $join];
 
         Settings::set('home', $home);
-
-        $this->deleteUnusedHomeImages($current, $home);
 
         return back()->with('success', 'Homepage saved.');
     }
@@ -321,23 +340,24 @@ class SettingsController extends Controller
             'delay' => ['required', 'integer', 'min:0', 'max:60'],
             'reset_views' => ['boolean'],
             'reset_image' => ['boolean'],
+            ...MediaLibrary::rules('image'),
         ]);
 
         $popup = Settings::popup();
         $restart = $request->boolean('reset_views');
 
-        if ($request->hasFile('image') || $request->boolean('reset_image')) {
-            if ($popup['image']) {
-                Storage::disk('public')->delete($popup['image']);
-            }
-
-            $popup['image'] = $request->hasFile('image') ? $this->storePopupImage($request->file('image')) : null;
+        if (MediaLibrary::chosen($request, 'image') || $request->boolean('reset_image')) {
+            $popup['image'] = match (true) {
+                $request->hasFile('image') => $this->storePopupImage($request->file('image')),
+                $request->filled('image_media') => MediaLibrary::resolve($request, 'image'),
+                default => null,
+            };
             $restart = true;
         }
 
         Settings::set('popup', [
             ...$popup,
-            ...collect($validated)->except(['image', 'reset_views', 'reset_image'])->all(),
+            ...collect($validated)->except(['image', 'image_media', 'reset_views', 'reset_image'])->all(),
             'version' => $popup['version'] + ($restart ? 1 : 0),
         ]);
 
@@ -429,21 +449,6 @@ class SettingsController extends Controller
     }
 
     /**
-     * @param  array<string, mixed>  $old
-     * @param  array<string, mixed>  $new
-     */
-    private function deleteUnusedHomeImages(array $old, array $new): void
-    {
-        $paths = fn (array $home) => collect($home['slides'])->pluck('image')
-            ->push($home['welcome']['image'], $home['welcome']['small_image'])
-            ->merge(collect($home['join']['steps'])->pluck('image'));
-
-        $paths($old)->diff($paths($new))
-            ->reject(fn (string $path) => str_starts_with($path, '/'))
-            ->each(fn (string $path) => Storage::disk('public')->delete($path));
-    }
-
-    /**
      * WebP keeps transparent edges at a fraction of a PNG's size.
      */
     private function storePopupImage(UploadedFile $file): string
@@ -456,6 +461,8 @@ class SettingsController extends Controller
         $path = 'popups/'.Str::uuid().'.webp';
 
         Storage::disk('public')->put($path, (string) $encoded);
+
+        MediaLibrary::register($path, $file);
 
         return $path;
     }

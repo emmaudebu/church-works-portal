@@ -8,11 +8,11 @@ use App\Models\DepartmentImage;
 use App\Models\Unit;
 use App\Models\User;
 use App\Support\GalleryUploads;
+use App\Support\MediaLibrary;
 use App\Support\Offices;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -230,14 +230,15 @@ class DepartmentContentController extends Controller
     }
 
     /**
-     * Remove a picture and its file.
+     * Remove a picture from the gallery, and its file unless another section shows it.
      */
     public function destroyImage(Request $request, DepartmentImage $image): RedirectResponse
     {
         $this->authorizeFor($request, $image->department_id);
 
-        Storage::disk('public')->delete($image->image);
         $image->delete();
+
+        MediaLibrary::discard($image->image);
 
         return back()->with('success', 'Picture removed.');
     }

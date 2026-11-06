@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DepartmentContentController;
 use App\Http\Controllers\Admin\DepartmentController;
 use App\Http\Controllers\Admin\ElectionController as AdminElectionController;
+use App\Http\Controllers\Admin\MediaController;
 use App\Http\Controllers\Admin\MemberController;
 use App\Http\Controllers\Admin\MemberStatusController;
 use App\Http\Controllers\Admin\PaymentController as AdminPaymentController;
@@ -83,6 +84,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/departments/{department}/bank', [DepartmentController::class, 'updateBank'])->name('departments.bank');
         Route::post('/departments/{department}/admins', [DepartmentController::class, 'assignAdmin'])->name('departments.admins.store');
         Route::delete('/departments/{department}/admins/{user}', [DepartmentController::class, 'removeAdmin'])->name('departments.admins.destroy');
+
+        Route::get('/media', [MediaController::class, 'index'])->name('media');
+        Route::get('/media/picker', [MediaController::class, 'picker'])->name('media.picker');
+        Route::post('/media', [MediaController::class, 'store'])->name('media.store');
+        Route::get('/media/{media}', [MediaController::class, 'show'])->name('media.show');
+        Route::delete('/media/{media}', [MediaController::class, 'destroy'])->name('media.destroy');
 
         Route::get('/members', [MemberController::class, 'index'])->name('members');
         Route::get('/members/export', [MemberController::class, 'export'])->name('members.export');

@@ -1,12 +1,13 @@
 import InputError from '@/Components/InputError';
 import InputLabel from '@/Components/InputLabel';
+import MediaField, { MediaChoice } from '@/Components/MediaField';
 import PrimaryButton from '@/Components/PrimaryButton';
 import RichTextEditor from '@/Components/RichTextEditor';
 import SecondaryButton from '@/Components/SecondaryButton';
 import TextInput from '@/Components/TextInput';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ChangeEvent, FormEventHandler, useRef, useState } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 type EditablePost = {
     id: number;
@@ -26,7 +27,6 @@ export default function Edit({
     post: EditablePost | null;
     audience: string;
 }) {
-    const fileInput = useRef<HTMLInputElement>(null);
     const [preview, setPreview] = useState(post?.image_url ?? null);
 
     const { data, setData, post: send, processing, errors } = useForm<{
@@ -37,6 +37,7 @@ export default function Edit({
         venue: string;
         event_date: string;
         image: File | null;
+        image_media: number | null;
         publish: boolean;
         notify: boolean;
     }>({
@@ -47,17 +48,14 @@ export default function Edit({
         venue: post?.venue ?? '',
         event_date: post?.event_date ?? '',
         image: null,
+        image_media: null,
         publish: post?.published ?? true,
         notify: true,
     });
 
-    const chooseImage = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-
-        if (file) {
-            setData('image', file);
-            setPreview(URL.createObjectURL(file));
-        }
+    const chooseImage = (choice: MediaChoice) => {
+        setData({ ...data, image: choice.file, image_media: choice.mediaId });
+        setPreview(choice.preview);
     };
 
     const submit: FormEventHandler = (e) => {
@@ -171,34 +169,14 @@ export default function Edit({
                         <InputError message={errors.body} className="mt-2" />
                     </div>
 
-                    <div>
-                        <span className="block text-sm font-medium text-neutral-900">
-                            Cover image (optional)
-                        </span>
-                        {preview && (
-                            <img
-                                src={preview}
-                                alt=""
-                                className="mt-2 max-h-48 rounded-lg"
-                            />
-                        )}
-                        <SecondaryButton
-                            onClick={() => fileInput.current?.click()}
-                            className="mt-2"
-                        >
-                            {preview ? 'Change image' : 'Choose image'}
-                        </SecondaryButton>
-                        <input
-                            ref={fileInput}
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp"
-                            aria-label="Cover image"
-                            tabIndex={-1}
-                            onChange={chooseImage}
-                            className="sr-only"
-                        />
-                        <InputError message={errors.image} className="mt-2" />
-                    </div>
+                    <MediaField
+                        id="image"
+                        label="Cover image (optional)"
+                        preview={preview}
+                        previewClassName="h-48 w-full sm:w-96"
+                        onChange={chooseImage}
+                        error={errors.image}
+                    />
                 </section>
 
                 <div className="flex flex-wrap items-center gap-x-6 gap-y-3">

@@ -145,7 +145,7 @@ const PICTURES_PER_UPLOAD = 12;
 /** Stays under the server's 32 MB limit for one request. */
 const BYTES_PER_UPLOAD = 24 * 1024 * 1024;
 
-function uploadBatches(files: File[]): File[][] {
+export function uploadBatches(files: File[]): File[][] {
     const batches: File[][] = [];
     let batch: File[] = [];
     let size = 0;

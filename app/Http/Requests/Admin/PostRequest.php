@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Support\MediaLibrary;
 use App\Support\RichText;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -25,6 +26,7 @@ class PostRequest extends FormRequest
                 }
             }],
             'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:8192'],
+            ...MediaLibrary::rules('image'),
             'event_date' => ['nullable', 'required_if:type,event', 'date'],
             'venue' => ['nullable', 'string', 'max:255'],
             'publish' => ['boolean'],
