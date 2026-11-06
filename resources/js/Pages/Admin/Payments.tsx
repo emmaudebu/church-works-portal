@@ -58,6 +58,15 @@ type Transaction = {
     method: string;
     paid_at: string | null;
     member: string | null;
+    download_url: string | null;
+    image_url: string | null;
+};
+
+type MonthlyDues = {
+    id: number;
+    amount: number;
+    is_active: boolean;
+    starts_on: string;
 };
 
 const filterClass =
@@ -72,10 +81,92 @@ function Stat({ label, value }: { label: string; value: string | number }) {
     );
 }
 
-function NewDueForm() {
+function MonthlyDuesForm({ monthly }: { monthly: MonthlyDues | null }) {
+    const form = useForm({
+        amount: monthly ? String(monthly.amount / 100) : '',
+        starts_on: monthly?.starts_on ?? new Date().toISOString().slice(0, 7),
+    });
+
+    const submit: FormEventHandler = (e) => {
+        e.preventDefault();
+
+        form.post(route('admin.dues.monthly'), { preserveScroll: true });
+    };
+
+    return (
+        <form
+            onSubmit={submit}
+            className="card space-y-3 border-t-2 border-gold-500 p-4 sm:p-6"
+        >
+            <div>
+                <h2 className="text-xl">Monthly dues</h2>
+                <p className="mt-1 text-sm text-neutral-600">
+                    Every member owes this amount each month, counted
+                    automatically from the starting month or when they joined.
+                    Members tick the months they pay for and must clear what
+                    they owe before paying ahead.
+                </p>
+            </div>
+            {monthly && !monthly.is_active && (
+                <p className="rounded-lg bg-gold-50 p-3 text-sm">
+                    Collection is stopped. Restart it in the list below.
+                </p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                    <InputLabel
+                        htmlFor="monthly_amount"
+                        value="Amount a month, in naira"
+                    />
+                    <TextInput
+                        id="monthly_amount"
+                        type="number"
+                        min={50}
+                        step="0.01"
+                        value={form.data.amount}
+                        onChange={(e) => form.setData('amount', e.target.value)}
+                        required
+                        className="mt-1 block w-full"
+                    />
+                    <InputError message={form.errors.amount} className="mt-2" />
+                </div>
+                <div>
+                    <InputLabel
+                        htmlFor="monthly_starts_on"
+                        value="Dues start from"
+                    />
+                    <TextInput
+                        id="monthly_starts_on"
+                        type="month"
+                        value={form.data.starts_on}
+                        onChange={(e) =>
+                            form.setData('starts_on', e.target.value)
+                        }
+                        required
+                        className="mt-1 block w-full"
+                    />
+                    <InputError
+                        message={form.errors.starts_on}
+                        className="mt-2"
+                    />
+                </div>
+            </div>
+            {monthly && (
+                <p className="text-xs text-neutral-600">
+                    A new amount applies to every month not yet paid. Months
+                    already paid keep what was paid.
+                </p>
+            )}
+            <PrimaryButton disabled={form.processing}>
+                {monthly ? 'Save monthly dues' : 'Start monthly dues'}
+            </PrimaryButton>
+        </form>
+    );
+}
+
+function NewLevyForm() {
     const form = useForm({
         title: '',
-        type: 'monthly',
         amount: '',
         starts_on: new Date().toISOString().slice(0, 10),
         due_on: '',
@@ -92,31 +183,19 @@ function NewDueForm() {
 
     return (
         <form onSubmit={submit} className="card space-y-3 p-4 sm:p-6">
-            <h2 className="text-xl">New due or levy</h2>
+            <h2 className="text-xl">New one-off levy</h2>
             <div className="grid gap-3 sm:grid-cols-2">
-                <div>
+                <div className="sm:col-span-2">
                     <InputLabel htmlFor="title" value="Title" />
                     <TextInput
                         id="title"
                         value={form.data.title}
-                        placeholder="For example Monthly dues"
+                        placeholder="For example Retreat levy"
                         onChange={(e) => form.setData('title', e.target.value)}
                         required
                         className="mt-1 block w-full"
                     />
                     <InputError message={form.errors.title} className="mt-2" />
-                </div>
-                <div>
-                    <InputLabel htmlFor="type" value="Type" />
-                    <select
-                        id="type"
-                        value={form.data.type}
-                        onChange={(e) => form.setData('type', e.target.value)}
-                        className="mt-1 block w-full rounded-lg border-neutral-200 focus:border-primary-700 focus:ring-primary-700"
-                    >
-                        <option value="monthly">Monthly dues</option>
-                        <option value="levy">One-off levy</option>
-                    </select>
                 </div>
                 <div>
                     <InputLabel htmlFor="amount" value="Amount in naira" />
@@ -156,6 +235,7 @@ function NewDueForm() {
 }
 
 export default function Payments({
+    monthly,
     dues,
     selected,
     report,
@@ -163,6 +243,7 @@ export default function Payments({
     transactions,
     canCreate,
 }: {
+    monthly: MonthlyDues | null;
     dues: Due[];
     selected: number | null;
     report: Report | null;
@@ -250,7 +331,13 @@ export default function Payments({
                 {canApprove && <ReceiptReviews reviews={reviews} />}
 
                 {!canManage ? null : canCreate ? (
-                    <NewDueForm />
+                    <>
+                        <MonthlyDuesForm
+                            key={`${monthly?.id}-${monthly?.amount}-${monthly?.starts_on}`}
+                            monthly={monthly}
+                        />
+                        <NewLevyForm />
+                    </>
                 ) : (
                     <p className="text-sm text-neutral-600">
                         Choose a department in the top bar to add dues.
@@ -548,8 +635,31 @@ export default function Payments({
                                             {payment.method}, {payment.paid_at}
                                         </span>
                                     </span>
-                                    <span className="shrink-0 tabular-nums">
-                                        {naira(payment.amount)}
+                                    <span className="flex shrink-0 flex-col items-end gap-1">
+                                        <span className="tabular-nums">
+                                            {naira(payment.amount)}
+                                        </span>
+                                        {payment.download_url && (
+                                            <span className="inline-flex items-center gap-1 text-xs text-neutral-600">
+                                                <Download
+                                                    size={12}
+                                                    aria-hidden="true"
+                                                />
+                                                Receipt:
+                                                <a
+                                                    href={payment.download_url}
+                                                    className="font-medium text-primary-700 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                                                >
+                                                    PDF
+                                                </a>
+                                                <a
+                                                    href={payment.image_url ?? undefined}
+                                                    className="font-medium text-primary-700 underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-700"
+                                                >
+                                                    JPEG
+                                                </a>
+                                            </span>
+                                        )}
                                     </span>
                                 </li>
                             ))}

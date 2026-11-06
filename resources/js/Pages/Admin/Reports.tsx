@@ -21,6 +21,8 @@ type Row = {
     attended: number;
     total: number;
     rate: number | null;
+    average_served: string | null;
+    no_clock_out: number;
     group: string;
 };
 
@@ -55,6 +57,8 @@ export default function Reports({
         services: number;
         regular: number;
         absentees: number;
+        average_served: string | null;
+        no_clock_out: number;
     };
     trend: TrendPoint[];
     members: Row[];
@@ -96,7 +100,7 @@ export default function Reports({
                 </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
                 <label className="text-sm font-medium">
                     From
                     <input
@@ -145,7 +149,7 @@ export default function Reports({
                 </label>
             </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
                 <Stat
                     label="Attendance rate"
                     value={summary.rate === null ? '—' : `${summary.rate}%`}
@@ -153,6 +157,11 @@ export default function Reports({
                 <Stat label="Services held" value={summary.services} />
                 <Stat label="Regular members" value={summary.regular} />
                 <Stat label="Frequent absentees" value={summary.absentees} />
+                <Stat
+                    label="Average time served"
+                    value={summary.average_served ?? '—'}
+                />
+                <Stat label="Missed clock-outs" value={summary.no_clock_out} />
             </div>
 
             {trend.length === 0 ? (
@@ -188,6 +197,12 @@ export default function Reports({
                                     <th scope="col" className="p-2 text-right font-medium">
                                         Rate
                                     </th>
+                                    <th
+                                        scope="col"
+                                        className="hidden p-2 text-right font-medium md:table-cell"
+                                    >
+                                        Time served
+                                    </th>
                                     <th scope="col" className="p-2 font-medium">
                                         Group
                                     </th>
@@ -213,6 +228,18 @@ export default function Reports({
                                                 {member.attended} of{' '}
                                                 {member.total} days
                                             </span>
+                                        </td>
+                                        <td className="hidden p-2 text-right tabular-nums md:table-cell">
+                                            {member.average_served ?? '—'}
+                                            {member.no_clock_out > 0 && (
+                                                <span className="block text-xs text-warning">
+                                                    {member.no_clock_out} missed
+                                                    clock-out
+                                                    {member.no_clock_out === 1
+                                                        ? ''
+                                                        : 's'}
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="p-2">
                                             {member.group in GROUP_BADGES ? (

@@ -32,7 +32,7 @@ class ScannerController extends Controller
             ->orderBy('opens_at')
             ->get();
 
-        $live = $services->filter->acceptsCheckIns();
+        $live = $services->filter(fn (Service $service) => $service->acceptsCheckIns() || $service->acceptsCheckOuts());
 
         if ($live->count() === 1) {
             return to_route('admin.scanner.show', $live->first());
@@ -45,7 +45,9 @@ class ScannerController extends Controller
                 'department' => $service->department->name,
                 'date_label' => $service->date->format('D j M'),
                 'window' => $service->opens_at->format('g:i A').' to '.$service->closes_at->format('g:i A'),
+                'ends' => $service->endsAt()->format('g:i A'),
                 'accepting' => $service->acceptsCheckIns(),
+                'clocking_out' => $service->acceptsCheckOuts(),
             ]),
         ]);
     }
@@ -62,6 +64,10 @@ class ScannerController extends Controller
                 ...$service->only(['id', 'title']),
                 'date_label' => $service->date->format('D j M Y'),
                 'accepting' => $service->acceptsCheckIns(),
+                'clocking_out' => $service->acceptsCheckOuts(),
+                'ended' => $service->hasEnded(),
+                'ends' => $service->endsAt()->format('g:i A'),
+                'clock_out_closes' => $service->clockOutClosesAt()->format('g:i A'),
             ],
             ...$this->liveCounts($service),
         ]);
@@ -93,6 +99,36 @@ class ScannerController extends Controller
 
         return response()->json([
             ...CheckIn::manual($service, User::findOrFail($validated['user_id']), $request->user()),
+            ...$this->liveCounts($service),
+        ]);
+    }
+
+    /**
+     * Clock out a scanned QR code at the exit.
+     */
+    public function checkOut(Request $request, Service $service): JsonResponse
+    {
+        $this->authorizeFor($request, $service);
+
+        $validated = $request->validate(['token' => ['required', 'string', 'max:255']]);
+
+        return response()->json([
+            ...CheckIn::scanOut($service, $validated['token'], $request->user()),
+            ...$this->liveCounts($service),
+        ]);
+    }
+
+    /**
+     * Clock someone out by hand.
+     */
+    public function manualOut(Request $request, Service $service): JsonResponse
+    {
+        $this->authorizeFor($request, $service);
+
+        $validated = $request->validate(['user_id' => ['required', 'integer', 'exists:users,id']]);
+
+        return response()->json([
+            ...CheckIn::manualOut($service, User::findOrFail($validated['user_id']), $request->user()),
             ...$this->liveCounts($service),
         ]);
     }
@@ -140,6 +176,20 @@ class ScannerController extends Controller
     {
         return [
             'count' => $service->attendance()->count(),
+            'out_count' => $service->attendance()->whereNotNull('checked_out_at')->count(),
+            'recent_out' => Attendance::where('service_id', $service->id)
+                ->whereNotNull('checked_out_at')
+                ->with('user')
+                ->latest('checked_out_at')
+                ->latest('id')
+                ->limit(8)
+                ->get()
+                ->map(fn (Attendance $row) => [
+                    ...CheckIn::present($row->user),
+                    'attendance_id' => $row->id,
+                    'checked_in_at' => $row->checked_out_at->format('g:i A'),
+                    'served' => Attendance::durationLabel($row->minutesServed()),
+                ]),
             'recent' => Attendance::where('service_id', $service->id)
                 ->with('user')
                 ->latest('checked_in_at')

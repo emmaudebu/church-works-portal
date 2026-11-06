@@ -46,6 +46,40 @@ class AttendanceStats
     }
 
     /**
+     * How each member does at clocking out: services they never clocked out
+     * of, counted only where clock-out was in use, and their average time
+     * served where both times are known.
+     *
+     * @param  Collection<int, User>  $members
+     * @param  Collection<int, Service>  $held
+     * @return Collection<int, array{no_clock_out: int, average_minutes: int|null}>
+     */
+    public static function clockOuts(Collection $members, Collection $held): Collection
+    {
+        $services = $held->keyBy('id');
+
+        $rows = Attendance::whereIn('service_id', $held->pluck('id'))
+            ->whereIn('user_id', $members->pluck('id'))
+            ->get(['service_id', 'user_id', 'checked_in_at', 'checked_out_at']);
+
+        $usedClockOut = $rows->whereNotNull('checked_out_at')->pluck('service_id')->unique()->flip();
+        $byMember = $rows->groupBy('user_id');
+
+        return $members->mapWithKeys(function (User $member) use ($byMember, $services, $usedClockOut) {
+            $mine = $byMember->get($member->id, collect());
+            $served = $mine->map(fn (Attendance $row) => $row->minutesServed())->filter(fn (?int $minutes) => $minutes !== null);
+
+            return [$member->id => [
+                'no_clock_out' => $mine->filter(fn (Attendance $row) => $row->clockOutStatus(
+                    $services[$row->service_id],
+                    $usedClockOut->has($row->service_id),
+                ) === 'missing')->count(),
+                'average_minutes' => $served->isNotEmpty() ? (int) round($served->avg()) : null,
+            ]];
+        });
+    }
+
+    /**
      * @param  Collection<int, int>  $departmentIds
      * @return Collection<int, Service>
      */
@@ -56,7 +90,7 @@ class AttendanceStats
             ->when($from, fn ($query) => $query->whereDate('date', '>=', $from))
             ->when($to, fn ($query) => $query->whereDate('date', '<=', $to))
             ->orderBy('date')
-            ->get(['id', 'department_id', 'title', 'type', 'date', 'opens_at']);
+            ->get(['id', 'department_id', 'title', 'type', 'date', 'opens_at', 'closes_at', 'ends_at']);
     }
 
     /**

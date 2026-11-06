@@ -21,7 +21,7 @@ class AttendanceLogExport extends StringValueBinder implements FromCollection, S
      */
     public function headings(): array
     {
-        return ['#', 'Member ID', 'Full name', 'Unit', 'Phone', 'Time in', 'Method', 'Recorded by'];
+        return ['#', 'Member ID', 'Full name', 'Unit', 'Phone', 'Time in', 'Time out', 'Time served', 'Method', 'Recorded by'];
     }
 
     /**
@@ -31,7 +31,9 @@ class AttendanceLogExport extends StringValueBinder implements FromCollection, S
     {
         return collect($this->entries)->map(fn (array $entry) => [
             $entry['position'], $entry['member_id'], $entry['full_name'], $entry['unit'],
-            $entry['phone'], $entry['time'], $entry['method'], $entry['recorded_by'],
+            $entry['phone'], $entry['time'],
+            $entry['out_time'] ?? ($entry['clock_out'] === 'missing' ? 'No clock-out' : ''),
+            $entry['served'], $entry['method'], $entry['recorded_by'],
         ]);
     }
 }

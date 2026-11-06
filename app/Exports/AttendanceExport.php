@@ -21,7 +21,7 @@ class AttendanceExport extends StringValueBinder implements FromCollection, Shou
      */
     public function headings(): array
     {
-        return ['Member ID', 'Full name', 'Unit', 'Days attended', 'Service days', 'Rate %', 'Group'];
+        return ['Member ID', 'Full name', 'Unit', 'Days attended', 'Service days', 'Rate %', 'Average time served', 'No clock-out', 'Group'];
     }
 
     /**
@@ -31,7 +31,8 @@ class AttendanceExport extends StringValueBinder implements FromCollection, Shou
     {
         return $this->members->map(fn (array $row) => [
             $row['member_id'], $row['full_name'], $row['unit'],
-            $row['attended'], $row['total'], $row['rate'], $row['group'],
+            $row['attended'], $row['total'], $row['rate'],
+            $row['average_served'], $row['no_clock_out'], $row['group'],
         ]);
     }
 }

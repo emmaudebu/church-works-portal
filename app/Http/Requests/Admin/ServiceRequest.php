@@ -18,6 +18,7 @@ class ServiceRequest extends FormRequest
             'date' => ['required', 'date'],
             'opens_at' => ['required', 'date_format:H:i'],
             'closes_at' => ['required', 'date_format:H:i', 'after:opens_at'],
+            'ends_at' => ['nullable', 'date_format:H:i', 'after:opens_at'],
         ];
     }
 
@@ -35,6 +36,7 @@ class ServiceRequest extends FormRequest
             'date' => $data['date'],
             'opens_at' => "{$data['date']} {$data['opens_at']}",
             'closes_at' => "{$data['date']} {$data['closes_at']}",
+            'ends_at' => "{$data['date']} ".($data['ends_at'] ?? $data['closes_at']),
         ];
     }
 }

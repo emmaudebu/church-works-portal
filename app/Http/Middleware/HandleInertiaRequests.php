@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use App\Models\Department;
 use App\Support\CurrentDepartment;
 use App\Support\Offices;
+use App\Support\PaymentReceipt;
 use App\Support\PaymentReviews;
 use App\Support\Settings;
 use Illuminate\Http\Request;
@@ -63,6 +64,7 @@ class HandleInertiaRequests extends Middleware
             'pendingReceipts' => fn () => $request->user()?->isAdmin() && $request->user()->canDo('approve_payments')
                 ? PaymentReviews::count($request->user())
                 : 0,
+            'receiptReady' => fn () => $request->user() ? PaymentReceipt::waiting($request->user()) : null,
             'whatsappTemplates' => fn () => $request->user()?->isAdmin() ? Settings::whatsapp() : null,
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

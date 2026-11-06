@@ -6,9 +6,12 @@ use App\Models\Due;
 use App\Models\Payment;
 use App\Models\User;
 use App\Support\Dues;
+use App\Support\PaymentReceipt;
 use App\Support\PaymentReviews;
 use App\Support\Paystack;
 use App\Support\PrivateDocument;
+use App\Support\ReceiptImage;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
@@ -32,10 +35,11 @@ class PaymentController extends Controller
         $user = $request->user();
 
         return Inertia::render('Member/Payments', [
-            'owing' => Dues::owing($user),
+            'arrears' => Dues::arrears($user),
             'payable' => Dues::payable($user),
+            'currentPeriod' => now()->format('Y-m'),
             'waiting' => PaymentReviews::rows($user->payments()->where('status', 'under_review')->oldest()->get()),
-            'history' => $user->payments()->where('status', 'success')->latest('paid_at')->limit(50)->get()->map->toRow(),
+            'history' => PaymentReviews::rows($user->payments()->where('status', 'success')->latest('paid_at')->limit(120)->get()),
             'canPayOnline' => Paystack::isConfigured(),
             'bankAccount' => $user->department?->hasBankAccount() ? $user->department->bankAccount() : null,
             'memberId' => $user->member_id,
@@ -51,7 +55,7 @@ class PaymentController extends Controller
 
         $user = $request->user();
         $due = Due::findOrFail($validated['due_id']);
-        $periods = Dues::payablePeriods($user, $due, $this->months($validated, $due));
+        $periods = Dues::choose($user, $due, $validated['periods'] ?? []);
 
         if ($periods === []) {
             return back()->withErrors(['payment' => 'This has already been paid or is not due.']);
@@ -96,7 +100,7 @@ class PaymentController extends Controller
 
         $user = $request->user();
         $due = Due::findOrFail($validated['due_id']);
-        $periods = Dues::payablePeriods($user, $due, $this->months($validated, $due));
+        $periods = Dues::choose($user, $due, $validated['periods'] ?? []);
 
         if ($periods === []) {
             return back()->withErrors(['payment' => 'This has already been paid or is being checked.']);
@@ -130,6 +134,35 @@ class PaymentController extends Controller
             'Content-Security-Policy' => 'sandbox',
             'X-Content-Type-Options' => 'nosniff',
         ]);
+    }
+
+    /**
+     * Download the receipt for a payment that went through, covering every
+     * month paid for with it, as a PDF or a JPEG photo. The member
+     * downloading it stops being asked to.
+     */
+    public function downloadReceipt(Request $request, Payment $payment, string $format = 'pdf'): HttpResponse
+    {
+        abort_unless($request->user()->is($payment->user) || $request->user()->canView($payment->user), 403);
+        abort_unless($payment->status === 'success', 404);
+
+        $payments = $payment->withBatch()->where('status', 'success')->values();
+
+        if ($request->user()->is($payment->user)) {
+            Payment::whereKey($payments->modelKeys())->whereNull('receipt_seen_at')->update(['receipt_seen_at' => now()]);
+        }
+
+        $details = PaymentReceipt::details($payments);
+        $number = PaymentReceipt::number($payments);
+
+        if ($format === 'jpg') {
+            return response((new ReceiptImage($details))->toJpeg(), 200, [
+                'Content-Type' => 'image/jpeg',
+                'Content-Disposition' => "attachment; filename=\"{$number}.jpg\"",
+            ]);
+        }
+
+        return Pdf::loadView('receipts.payment', $details)->setPaper('a5')->download("{$number}.pdf");
     }
 
     /**
@@ -180,16 +213,9 @@ class PaymentController extends Controller
     {
         return [
             'due_id' => ['required', 'integer', 'exists:dues,id'],
-            'months' => ['nullable', 'integer', 'min:1', 'max:'.Dues::MAX_MONTHS],
+            'periods' => ['nullable', 'array', 'max:'.Dues::MAX_MONTHS],
+            'periods.*' => ['string', 'regex:/^\d{4}-\d{2}$/'],
         ];
-    }
-
-    /**
-     * @param  array<string, mixed>  $validated
-     */
-    private function months(array $validated, Due $due): int
-    {
-        return $due->type === 'monthly' ? (int) ($validated['months'] ?? 1) : 1;
     }
 
     /**

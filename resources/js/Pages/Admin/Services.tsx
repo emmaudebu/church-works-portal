@@ -22,6 +22,7 @@ type Service = {
     date_label: string;
     opens_at: string;
     closes_at: string;
+    ends_at: string;
     department: string;
     accepting: boolean;
     can_open: boolean;
@@ -29,7 +30,13 @@ type Service = {
     recurring: boolean;
 };
 
-const blank = { title: '', date: '', opens_at: '', closes_at: '' };
+const blank = {
+    title: '',
+    date: '',
+    opens_at: '',
+    closes_at: '',
+    ends_at: '',
+};
 
 export default function Services({
     services,
@@ -52,6 +59,7 @@ export default function Services({
             date: service.date,
             opens_at: service.opens_at,
             closes_at: service.closes_at,
+            ends_at: service.ends_at,
         });
         setEditing(service);
     };
@@ -115,7 +123,8 @@ export default function Services({
                             </div>
                             <p className="text-sm text-neutral-600">
                                 {service.date_label} · {service.opens_at} to{' '}
-                                {service.closes_at} · {service.department}
+                                {service.closes_at} · Ends {service.ends_at} ·{' '}
+                                {service.department}
                             </p>
                             <p className="text-sm tabular-nums text-neutral-600">
                                 {service.attendance_count} checked in
@@ -268,9 +277,9 @@ export default function Services({
                         />
                         <InputError message={form.errors.date} className="mt-2" />
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                         <div>
-                            <InputLabel htmlFor="opens_at" value="Opens" />
+                            <InputLabel htmlFor="opens_at" value="Check-in opens" />
                             <TextInput
                                 id="opens_at"
                                 type="time"
@@ -287,7 +296,7 @@ export default function Services({
                             />
                         </div>
                         <div>
-                            <InputLabel htmlFor="closes_at" value="Closes" />
+                            <InputLabel htmlFor="closes_at" value="Check-in closes" />
                             <TextInput
                                 id="closes_at"
                                 type="time"
@@ -303,7 +312,28 @@ export default function Services({
                                 className="mt-2"
                             />
                         </div>
+                        <div>
+                            <InputLabel htmlFor="ends_at" value="Service ends" />
+                            <TextInput
+                                id="ends_at"
+                                type="time"
+                                value={form.data.ends_at}
+                                onChange={(e) =>
+                                    form.setData('ends_at', e.target.value)
+                                }
+                                className="mt-1 block w-full"
+                            />
+                            <InputError
+                                message={form.errors.ends_at}
+                                className="mt-2"
+                            />
+                        </div>
                     </div>
+                    <p className="text-xs text-neutral-600">
+                        Members are scanned out at the exit from when the
+                        service ends, for 3 hours. Left empty, it ends when
+                        check-in closes.
+                    </p>
                     <div className="flex justify-end gap-3">
                         <SecondaryButton onClick={() => setEditing(null)}>
                             Cancel

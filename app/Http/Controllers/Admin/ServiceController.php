@@ -40,6 +40,7 @@ class ServiceController extends Controller
                     'date_label' => $service->date->format('D j M Y'),
                     'opens_at' => $service->opens_at->format('H:i'),
                     'closes_at' => $service->closes_at->format('H:i'),
+                    'ends_at' => $service->endsAt()->format('H:i'),
                     'department' => $service->department->name,
                     'accepting' => $service->acceptsCheckIns(),
                     'can_open' => $service->date->lte(today()),

@@ -11,12 +11,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Carbon;
 
-#[Fillable(['department_id', 'type', 'recurring_key', 'title', 'date', 'opens_at', 'closes_at', 'is_open'])]
+#[Fillable(['department_id', 'type', 'recurring_key', 'title', 'date', 'opens_at', 'closes_at', 'ends_at', 'is_open'])]
 class Service extends Model
 {
     /** @use HasFactory<ServiceFactory> */
     use HasFactory, ManagedByDepartment, SoftDeletes;
+
+    /** How long after a service ends members can still be scanned out. */
+    public const CLOCK_OUT_HOURS = 3;
 
     /**
      * Get the attributes that should be cast.
@@ -29,6 +33,7 @@ class Service extends Model
             'date' => 'date',
             'opens_at' => 'datetime',
             'closes_at' => 'datetime',
+            'ends_at' => 'datetime',
             'is_open' => 'boolean',
         ];
     }
@@ -63,6 +68,33 @@ class Service extends Model
     public function acceptsCheckIns(): bool
     {
         return $this->is_open && now()->between($this->opens_at, $this->closes_at);
+    }
+
+    /**
+     * When the service ends and clocking out opens. Without its own end time a
+     * service ends when check-in closes.
+     */
+    public function endsAt(): Carbon
+    {
+        return $this->ends_at ?? $this->closes_at;
+    }
+
+    public function clockOutClosesAt(): Carbon
+    {
+        return $this->endsAt()->copy()->addHours(self::CLOCK_OUT_HOURS);
+    }
+
+    public function hasEnded(): bool
+    {
+        return now()->gte($this->endsAt());
+    }
+
+    /**
+     * Whether members can be scanned out at the exit now.
+     */
+    public function acceptsCheckOuts(): bool
+    {
+        return now()->between($this->endsAt(), $this->clockOutClosesAt());
     }
 
     /**

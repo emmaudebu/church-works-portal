@@ -255,6 +255,10 @@ export default function GalleryUploadForm({
                     className="mt-1 block w-full text-sm font-normal"
                 />
             </label>
+            <p className="text-xs text-neutral-600">
+                Gallery photos are kept for 3 months, then cleared
+                automatically.
+            </p>
             <InputError message={uploadError} />
             <div className="flex flex-wrap items-center gap-3">
                 <PrimaryButton

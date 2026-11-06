@@ -171,7 +171,10 @@ test('publishing results shows them to members and hiding removes them', functio
         ->assertRedirect();
 
     $this->actingAs($this->member)->get(route('member.elections.results', $this->election))
-        ->assertInertia(fn (Assert $page) => $page->component('Member/Elections/Results')->where('results.0.total', 1));
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Member/Elections/Results')
+            ->where('results.0.total', 1)
+            ->where('election.status', $this->election->status()));
 
     $this->actingAs($this->admin)
         ->patch(route('admin.elections.results', $this->election), ['results_public' => false]);

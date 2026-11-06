@@ -145,6 +145,37 @@ export default {
                     '0%, 100%': { boxShadow: '0 0 0 0 rgb(var(--gold-500) / 0.45)' },
                     '50%': { boxShadow: '0 0 0 14px rgb(var(--gold-500) / 0)' },
                 },
+                'icon-wiggle': {
+                    '0%, 100%': { transform: 'rotate(0)' },
+                    '25%': { transform: 'rotate(-14deg)' },
+                    '75%': { transform: 'rotate(14deg)' },
+                },
+                'icon-hop': {
+                    '0%, 100%': { transform: 'translateY(0)' },
+                    '40%': { transform: 'translateY(-4px)' },
+                    '70%': { transform: 'translateY(1px)' },
+                },
+                'icon-pop': {
+                    '0%, 100%': { transform: 'scale(1)' },
+                    '50%': { transform: 'scale(1.25)' },
+                },
+                'icon-turn': {
+                    from: { transform: 'rotate(0)' },
+                    to: { transform: 'rotate(180deg)' },
+                },
+                'icon-swing': {
+                    '0%, 100%': { transform: 'rotate(0)' },
+                    '30%': { transform: 'rotate(12deg)' },
+                    '60%': { transform: 'rotate(-8deg)' },
+                },
+                'icon-scan': {
+                    '0%, 100%': { transform: 'scaleY(1)' },
+                    '50%': { transform: 'scaleY(0.75)' },
+                },
+                'nav-in': {
+                    from: { opacity: 0, transform: 'translateX(-14px)' },
+                    to: { opacity: 1, transform: 'none' },
+                },
             },
             animation: {
                 float: 'float 6s ease-in-out infinite',
@@ -170,6 +201,13 @@ export default {
                 'popup-bounce': 'popup-bounce 0.8s ease-out both',
                 'popup-flip': 'popup-flip 0.7s cubic-bezier(0.22, 1, 0.36, 1) both',
                 pulse: 'pulse 2.8s ease-out infinite',
+                'icon-wiggle': 'icon-wiggle 0.6s ease-in-out',
+                'icon-hop': 'icon-hop 0.6s ease-out',
+                'icon-pop': 'icon-pop 0.45s ease-out',
+                'icon-turn': 'icon-turn 0.7s cubic-bezier(0.22, 1, 0.36, 1)',
+                'icon-swing': 'icon-swing 0.7s ease-in-out',
+                'icon-scan': 'icon-scan 0.6s ease-in-out',
+                'nav-in': 'nav-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
             },
             transitionTimingFunction: {
                 DEFAULT: 'cubic-bezier(0, 0, 0.2, 1)',

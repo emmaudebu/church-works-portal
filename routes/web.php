@@ -113,17 +113,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/scanner/{service}', [ScannerController::class, 'show'])->name('scanner.show')->middleware('office:take_attendance');
         Route::post('/scanner/{service}/check-in', [ScannerController::class, 'checkIn'])->name('scanner.check-in')->middleware('office:take_attendance');
         Route::post('/scanner/{service}/manual', [ScannerController::class, 'manual'])->name('scanner.manual')->middleware('office:take_attendance');
+        Route::post('/scanner/{service}/check-out', [ScannerController::class, 'checkOut'])->name('scanner.check-out')->middleware('office:take_attendance');
+        Route::post('/scanner/{service}/manual-out', [ScannerController::class, 'manualOut'])->name('scanner.manual-out')->middleware('office:take_attendance');
         Route::get('/scanner/{service}/search', [ScannerController::class, 'search'])->name('scanner.search')->middleware('office:take_attendance');
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports')->middleware('office:view_reports');
         Route::get('/reports/export/{format}', [ReportController::class, 'export'])->name('reports.export')->middleware('office:view_reports');
         Route::get('/attendance-log', [AttendanceLogController::class, 'index'])->name('attendance-log')->middleware('office:view_reports');
         Route::get('/attendance-log/{service}/export', [AttendanceLogController::class, 'export'])->name('attendance-log.export')->middleware('office:view_reports');
+        Route::patch('/attendance/{attendance}/check-out', [AttendanceLogController::class, 'checkOut'])->name('attendance.check-out')->middleware('office:take_attendance');
 
         Route::get('/payments', [AdminPaymentController::class, 'index'])->name('payments')->middleware('office:view_payments');
         Route::post('/payments/{payment}/approve', [AdminPaymentController::class, 'approve'])->name('payments.approve')->middleware('office:approve_payments');
         Route::post('/payments/{payment}/reject', [AdminPaymentController::class, 'reject'])->name('payments.reject')->middleware('office:approve_payments');
         Route::post('/dues', [AdminPaymentController::class, 'store'])->name('dues.store')->middleware('office:manage_payments');
+        Route::post('/dues/monthly', [AdminPaymentController::class, 'saveMonthly'])->name('dues.monthly')->middleware('office:manage_payments');
         Route::post('/dues/{due}/toggle', [AdminPaymentController::class, 'toggle'])->name('dues.toggle')->middleware('office:manage_payments');
         Route::delete('/dues/{due}', [AdminPaymentController::class, 'destroy'])->name('dues.destroy')->middleware('office:manage_payments');
         Route::post('/dues/{due}/cash', [AdminPaymentController::class, 'recordCash'])->name('dues.cash')->middleware('office:record_payments');
@@ -179,6 +183,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/push/subscribe', [PushSubscriptionController::class, 'store'])->name('push.store');
     Route::post('/push/unsubscribe', [PushSubscriptionController::class, 'destroy'])->name('push.destroy');
     Route::get('/receipts/{payment}', [PaymentController::class, 'receipt'])->name('payments.receipt');
+    Route::get('/receipts/{payment}/download/{format?}', [PaymentController::class, 'downloadReceipt'])->whereIn('format', ['pdf', 'jpg'])->name('payments.receipt.download');
     Route::get('/certificates/{user}/{type}', [CertificateController::class, 'show'])->name('certificates.show');
     Route::get('/qr/{user}', [QrCodeController::class, 'show'])->name('qr.show');
     Route::get('/id-card/{user}', [QrCodeController::class, 'idCard'])->name('id-card');

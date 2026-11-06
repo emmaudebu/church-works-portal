@@ -6,8 +6,12 @@ use App\Exports\AttendanceLogExport;
 use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Service;
+use App\Support\CheckIn;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Maatwebsite\Excel\Facades\Excel;
@@ -49,10 +53,44 @@ class AttendanceLogController extends Controller
                 'title' => $service->title,
                 'date_label' => $service->date->format('l j F Y'),
                 'window' => $service->opens_at->format('g:i A').' to '.$service->closes_at->format('g:i A'),
+                'clock_out_window' => $service->endsAt()->format('g:i A').' to '.$service->clockOutClosesAt()->format('g:i A'),
+                'used_clock_out' => $this->usedClockOut($service),
+                'ended' => $service->hasEnded(),
                 'department' => $service->department->name,
             ] : null,
             'entries' => $service ? $this->entries($service) : [],
+            'canFix' => $admin->canDo('take_attendance'),
         ]);
+    }
+
+    /**
+     * Fill in when someone left, for a person who was never scanned out.
+     */
+    public function checkOut(Request $request, Attendance $attendance): RedirectResponse
+    {
+        $service = $attendance->service;
+
+        abort_unless($service && $request->user()->canAccessDepartment($service->department_id), 404);
+
+        $validated = $request->validate(['time' => ['required', 'date_format:H:i']]);
+
+        $at = Carbon::parse($service->date->toDateString().' '.$validated['time']);
+
+        if ($at->lte($attendance->checked_in_at)) {
+            throw ValidationException::withMessages(['time' => 'The clock-out time must be after they checked in at '.$attendance->checked_in_at->format('g:i A').'.']);
+        }
+
+        $result = CheckIn::manualOut($service, $attendance->user, $request->user(), $at);
+
+        if ($result['status'] !== 'out') {
+            throw ValidationException::withMessages(['time' => match ($result['status']) {
+                'already_out' => 'They have already clocked out.',
+                'not_ended' => 'This service has not ended yet.',
+                default => 'This clock-out could not be recorded.',
+            }]);
+        }
+
+        return back()->with('success', "Clock-out recorded for {$attendance->user->full_name}.");
     }
 
     /**
@@ -68,12 +106,23 @@ class AttendanceLogController extends Controller
     }
 
     /**
-     * Everyone who clocked in, earliest first.
+     * Whether anybody was scanned out of this service, so missing clock-outs
+     * mean something.
+     */
+    private function usedClockOut(Service $service): bool
+    {
+        return $service->attendance()->whereNotNull('checked_out_at')->exists();
+    }
+
+    /**
+     * Everyone who clocked in, earliest first, with when they left.
      *
-     * @return list<array{position: int, id: int, full_name: string, member_id: string|null, unit: string|null, phone: string|null, photo_url: string|null, time: string, method: string, recorded_by: string|null}>
+     * @return list<array{position: int, attendance_id: int, id: int, full_name: string, member_id: string|null, unit: string|null, phone: string|null, photo_url: string|null, time: string, method: string, recorded_by: string|null, out_time: string|null, served: string|null, clock_out: string}>
      */
     private function entries(Service $service): array
     {
+        $usedClockOut = $this->usedClockOut($service);
+
         return $service->attendance()
             ->with(['user', 'recorder:id,full_name'])
             ->orderBy('checked_in_at')
@@ -82,6 +131,7 @@ class AttendanceLogController extends Controller
             ->values()
             ->map(fn (Attendance $attendance, int $index) => [
                 'position' => $index + 1,
+                'attendance_id' => $attendance->id,
                 'id' => $attendance->user->id,
                 'full_name' => $attendance->user->full_name,
                 'member_id' => $attendance->user->member_id,
@@ -91,6 +141,9 @@ class AttendanceLogController extends Controller
                 'time' => $attendance->checked_in_at->format('g:i:s A'),
                 'method' => $attendance->method === 'manual' ? 'Manual' : 'QR scan',
                 'recorded_by' => $attendance->recorder?->full_name,
+                'out_time' => $attendance->checked_out_at?->format('g:i:s A'),
+                'served' => Attendance::durationLabel($attendance->minutesServed()),
+                'clock_out' => $attendance->clockOutStatus($service, $usedClockOut),
             ])
             ->all();
     }

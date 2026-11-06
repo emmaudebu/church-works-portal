@@ -53,6 +53,7 @@ class ServiceGenerator
                             'title' => $service['title'],
                             'opens_at' => $day->copy()->setTimeFromTimeString($service['opens']),
                             'closes_at' => $day->copy()->setTimeFromTimeString($service['closes']),
+                            'ends_at' => $day->copy()->setTimeFromTimeString($service['ends']),
                         ],
                     );
                 }

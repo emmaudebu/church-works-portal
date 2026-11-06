@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Notifications\PaymentDecided;
 use App\Notifications\PaymentSubmitted;
 use App\Support\Dues;
+use App\Support\PaymentReceipt;
 use App\Support\Paystack;
 use App\Support\Settings;
 use Database\Seeders\DepartmentSeeder;
@@ -86,7 +87,7 @@ test('paying sends the member to paystack with the amount from the server', func
     ])]);
 
     $this->actingAs($this->member)
-        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'amount' => 1], ['X-Inertia' => 'true'])
+        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => ['2026-09'], 'amount' => 1], ['X-Inertia' => 'true'])
         ->assertStatus(409)
         ->assertHeader('X-Inertia-Location', 'https://checkout.paystack.com/abc');
 
@@ -113,18 +114,18 @@ test('without keys online payment is refused politely', function () {
     Http::fake();
 
     $this->actingAs($this->member)
-        ->post(route('member.payments.pay'), ['due_id' => $this->due->id])
+        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => ['2026-09']])
         ->assertSessionHasErrors('payment');
 
     $this->actingAs($this->member)->get('/payments')
-        ->assertInertia(fn (Assert $page) => $page->where('canPayOnline', false)->has('owing', 3));
+        ->assertInertia(fn (Assert $page) => $page->where('canPayOnline', false)->where('arrears.0.months', 3));
 });
 
 test('a paystack failure leaves nothing paid', function () {
     Http::fake(['*' => Http::response(['status' => false], 400)]);
 
     $this->actingAs($this->member)
-        ->post(route('member.payments.pay'), ['due_id' => $this->due->id])
+        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => ['2026-09']])
         ->assertSessionHasErrors('payment');
 
     expect(Payment::first()->status)->toBe('failed');
@@ -348,7 +349,7 @@ function submitTransfer(object $test, ?User $member = null, int $months = 1)
 {
     return $test->actingAs($member ?? $test->member)->post(route('member.payments.transfer'), [
         'due_id' => $test->due->id,
-        'months' => $months,
+        'periods' => Dues::payablePeriods($member ?? $test->member, $test->due, $months),
         'receipt' => UploadedFile::fake()->image('receipt.jpg', 2400, 1200),
     ]);
 }
@@ -626,7 +627,10 @@ test('paying six months covers what is owed then runs into future months', funct
     ])]);
 
     $this->actingAs($this->member)
-        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'months' => 6], ['X-Inertia' => 'true'])
+        ->post(route('member.payments.pay'), [
+            'due_id' => $this->due->id,
+            'periods' => ['2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02'],
+        ], ['X-Inertia' => 'true'])
         ->assertStatus(409);
 
     expect(Payment::orderBy('period')->pluck('period')->all())
@@ -698,8 +702,10 @@ test('a multi-month transfer is one receipt to check and is decided as a whole',
 test('a levy is always one payment and months are limited', function () {
     Http::fake();
 
-    $this->actingAs($this->member)->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'months' => 25])
-        ->assertSessionHasErrors('months');
+    $periods = collect(range(0, 24))->map(fn (int $month) => Carbon::parse('2026-09-01')->addMonths($month)->format('Y-m'))->all();
+
+    $this->actingAs($this->member)->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => $periods])
+        ->assertSessionHasErrors('periods');
 
     $levy = Due::create(['department_id' => $this->technical->id, 'title' => 'Retreat', 'type' => 'levy', 'amount' => 500000, 'starts_on' => '2026-11-01'])->refresh();
 
@@ -714,9 +720,182 @@ test('cash can cover several months', function () {
     expect(Payment::orderBy('period')->pluck('period')->all())->toBe(['2026-10', '2026-11', '2026-12']);
 });
 
-test('the payment page offers up to two years ahead', function () {
+test('the payment page shows every month to the end of next year, marked paid, checking or open', function () {
+    pendingPayment($this, '2026-09')->update(['status' => 'success']);
+    pendingPayment($this, '2026-10')->update(['status' => 'under_review']);
+
     $this->actingAs($this->member)->get('/payments')->assertInertia(fn (Assert $page) => $page
         ->has('payable', 1)
-        ->has('payable.0.periods', 24)
-        ->where('payable.0.periods.0', 'September 2026'));
+        ->has('payable.0.months', 16)
+        ->where('payable.0.months.0', ['period' => '2026-09', 'status' => 'paid'])
+        ->where('payable.0.months.1', ['period' => '2026-10', 'status' => 'review'])
+        ->where('payable.0.months.2', ['period' => '2026-11', 'status' => 'open'])
+        ->where('payable.0.months.15.period', '2027-12')
+        ->where('currentPeriod', '2026-11'));
+});
+
+test('months owed must be paid before newer months', function () {
+    Http::fake();
+
+    $this->actingAs($this->member)
+        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => ['2026-10', '2026-11']])
+        ->assertSessionHasErrors(['periods' => 'Please pay for September 2026 first. Months owed are paid before new ones.']);
+
+    $this->actingAs($this->member)
+        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => ['2026-09', '2026-11']])
+        ->assertSessionHasErrors(['periods' => 'Please pay for October 2026 first. Months owed are paid before new ones.']);
+
+    $this->actingAs($this->member)
+        ->post(route('member.payments.pay'), ['due_id' => $this->due->id, 'periods' => []])
+        ->assertSessionHasErrors('periods');
+
+    Http::assertNothingSent();
+    expect(Payment::count())->toBe(0);
+});
+
+test('the amount is the dues amount times the months ticked', function () {
+    Storage::fake('local');
+    setBank($this);
+
+    submitTransfer($this, months: 4)->assertSessionHasNoErrors();
+
+    expect(Payment::sum('amount'))->toEqual(800000)
+        ->and(Payment::orderBy('period')->pluck('period')->all())->toBe(['2026-09', '2026-10', '2026-11', '2026-12']);
+});
+
+test('the member is told how many months they owe, from when to when', function () {
+    pendingPayment($this, '2026-11')->update(['status' => 'under_review']);
+
+    $this->actingAs($this->member)->get('/payments')->assertInertia(fn (Assert $page) => $page
+        ->has('arrears', 1)
+        ->where('arrears.0.months', 2)
+        ->where('arrears.0.from', 'September 2026')
+        ->where('arrears.0.to', 'October 2026')
+        ->where('arrears.0.amount', 400000)
+        ->where('arrears.0.under_review', 1));
+});
+
+test('an admin sets the monthly dues amount and members owe it every month', function () {
+    $this->actingAs($this->admin)->post(route('admin.dues.monthly'), ['amount' => '1500', 'starts_on' => '2026-10'])
+        ->assertRedirect()->assertSessionHasNoErrors();
+
+    expect(Due::where('type', 'monthly')->count())->toBe(1)
+        ->and($this->due->fresh()->amount)->toBe(150000)
+        ->and(Dues::owing($this->member)->pluck('period')->all())->toBe(['2026-10', '2026-11'])
+        ->and(Dues::owing($this->member)->sum('amount'))->toBe(300000);
+
+    $this->actingAs($this->admin)->get('/admin/payments')->assertInertia(fn (Assert $page) => $page
+        ->where('monthly.amount', 150000)
+        ->where('monthly.starts_on', '2026-10'));
+});
+
+test('a department without monthly dues gets them when the amount is first set', function () {
+    $choirAdmin = User::factory()->create(['department_id' => $this->choir->id])->assignRole('dept_admin');
+
+    $this->actingAs($choirAdmin)->post(route('admin.dues.monthly'), ['amount' => '500', 'starts_on' => '2026-11'])
+        ->assertSessionHasNoErrors();
+
+    $due = Dues::standing($this->choir->id);
+
+    expect($due->title)->toBe('Monthly dues')
+        ->and($due->amount)->toBe(50000)
+        ->and(Dues::owing($this->outsider)->pluck('period')->all())->toBe(['2026-11']);
+
+    $this->actingAs($choirAdmin)->post(route('admin.dues.monthly'), ['amount' => '10', 'starts_on' => 'soon'])
+        ->assertSessionHasErrors(['amount', 'starts_on']);
+
+    $this->actingAs($this->member)->post(route('admin.dues.monthly'), ['amount' => '500', 'starts_on' => '2026-11'])
+        ->assertForbidden();
+});
+
+test('dues created by hand are always one-off levies', function () {
+    $this->actingAs($this->admin)->post(route('admin.dues.store'), [
+        'title' => 'Second dues', 'type' => 'monthly', 'amount' => '1000', 'starts_on' => '2026-11-01',
+    ])->assertSessionHasNoErrors();
+
+    expect(Due::firstWhere('title', 'Second dues')->type)->toBe('levy');
+});
+
+test('a member downloads a receipt covering every month of their payment', function () {
+    Storage::fake('local');
+    setBank($this);
+    submitTransfer($this, months: 3);
+    $payment = Payment::first();
+
+    $this->actingAs($this->member)->get(route('payments.receipt.download', $payment))->assertNotFound();
+
+    $this->actingAs($this->admin)->post(route('admin.payments.approve', $payment));
+
+    $this->actingAs($this->admin)->get(route('payments.receipt.download', $payment))->assertOk();
+    $this->actingAs($this->outsider)->get(route('payments.receipt.download', $payment))->assertForbidden();
+
+    expect(Payment::whereNotNull('receipt_seen_at')->count())->toBe(0);
+
+    $this->actingAs($this->member)->get(route('payments.receipt.download', $payment))
+        ->assertOk()
+        ->assertHeader('content-type', 'application/pdf')
+        ->assertDownload('RCP-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT).'.pdf');
+
+    expect(Payment::whereNull('receipt_seen_at')->count())->toBe(0);
+});
+
+test('a receipt can also be saved as a jpeg photo', function () {
+    Storage::fake('local');
+    setBank($this);
+    submitTransfer($this, months: 3);
+    $payment = Payment::first();
+    $this->actingAs($this->admin)->post(route('admin.payments.approve', $payment));
+
+    $response = $this->actingAs($this->member)->get(route('payments.receipt.download', [$payment, 'jpg']))
+        ->assertOk()
+        ->assertHeader('content-type', 'image/jpeg')
+        ->assertDownload('RCP-'.str_pad((string) $payment->id, 6, '0', STR_PAD_LEFT).'.jpg');
+
+    expect(getimagesizefromstring($response->getContent())[2])->toBe(IMAGETYPE_JPEG)
+        ->and(Payment::whereNull('receipt_seen_at')->count())->toBe(0);
+
+    $this->actingAs($this->member)->get(route('payments.receipt.download', [$payment, 'gif']))->assertNotFound();
+    $this->actingAs($this->outsider)->get(route('payments.receipt.download', [$payment, 'jpg']))->assertForbidden();
+});
+
+test('the receipt shows the total, in words, and who approved it', function () {
+    Storage::fake('local');
+    setBank($this);
+    submitTransfer($this, months: 3);
+    $this->actingAs($this->admin)->post(route('admin.payments.approve', Payment::first()));
+
+    $receipt = PaymentReceipt::details(Payment::first()->withBatch());
+
+    expect($receipt['total'])->toBe('₦6,000.00')
+        ->and($receipt['in_words'])->toBe('Six thousand naira only')
+        ->and($receipt['covers'])->toBe('September 2026 to November 2026 (3 months)')
+        ->and($receipt['months'])->toBe(['September 2026', 'October 2026', 'November 2026'])
+        ->and($receipt['approver']['name'])->toBe($this->admin->full_name)
+        ->and(PaymentReceipt::inWords(150050))->toBe('One thousand five hundred naira and fifty kobo only');
+});
+
+test('once a payment is approved the member is asked to download the receipt until they do', function () {
+    Storage::fake('local');
+    setBank($this);
+    submitTransfer($this, months: 2);
+    $payment = Payment::first();
+
+    $this->actingAs($this->member)->get('/payments')->assertInertia(fn (Assert $page) => $page->where('receiptReady', null));
+
+    $this->actingAs($this->admin)->post(route('admin.payments.approve', $payment));
+
+    $this->actingAs($this->member)->get('/home')->assertInertia(fn (Assert $page) => $page
+        ->where('receiptReady.amount', 400000)
+        ->where('receiptReady.covers', 'September 2026 to October 2026 (2 months)')
+        ->where('receiptReady.download_url', route('payments.receipt.download', $payment)));
+
+    $this->actingAs($this->admin)->get('/admin')->assertInertia(fn (Assert $page) => $page->where('receiptReady', null));
+
+    $this->actingAs($this->member)->get(route('payments.receipt.download', $payment));
+
+    $this->actingAs($this->member)->get('/payments')->assertInertia(fn (Assert $page) => $page
+        ->where('receiptReady', null)
+        ->has('history', 1)
+        ->where('history.0.amount', 400000)
+        ->where('history.0.download_url', route('payments.receipt.download', $payment)));
 });

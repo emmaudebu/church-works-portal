@@ -13,7 +13,6 @@ use App\Support\PaymentReviews;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -33,8 +32,14 @@ class PaymentController extends Controller
         $dues = Due::managedBy($admin)->with('department:id,name')->latest()->get();
 
         $selected = $dues->firstWhere('id', (int) $request->query('due')) ?? $dues->firstWhere('is_active', true) ?? $dues->first();
+        $departmentId = CurrentDepartment::forNewRecords($admin);
+        $monthly = $departmentId ? Dues::standing($departmentId) : null;
 
         return Inertia::render('Admin/Payments', [
+            'monthly' => $monthly ? [
+                ...$monthly->only(['id', 'amount', 'is_active']),
+                'starts_on' => $monthly->starts_on->format('Y-m'),
+            ] : null,
             'dues' => $dues->map(fn (Due $due) => [
                 ...$due->only(['id', 'title', 'type', 'amount', 'is_active']),
                 'department' => $due->department->name,
@@ -71,7 +76,8 @@ class PaymentController extends Controller
     }
 
     /**
-     * Create a due or levy in the admin's working department.
+     * Create a one-off levy in the admin's working department. Monthly dues
+     * are set once with an amount instead, see saveMonthly.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -81,7 +87,6 @@ class PaymentController extends Controller
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'type' => ['required', Rule::in(['monthly', 'levy'])],
             'amount' => ['required', 'numeric', 'min:'.self::MINIMUM_NAIRA, 'max:10000000'],
             'starts_on' => ['required', 'date'],
             'due_on' => ['nullable', 'date', 'after_or_equal:starts_on'],
@@ -89,11 +94,45 @@ class PaymentController extends Controller
 
         Due::create([
             ...$validated,
+            'type' => 'levy',
             'amount' => (int) round($validated['amount'] * 100),
             'department_id' => $departmentId,
         ]);
 
-        return back()->with('success', 'Due created.');
+        return back()->with('success', 'Levy created.');
+    }
+
+    /**
+     * Set how much the department's monthly dues are. Every member then owes
+     * that amount each month, from the starting month or when they joined.
+     */
+    public function saveMonthly(Request $request): RedirectResponse
+    {
+        $departmentId = CurrentDepartment::forNewRecords($request->user());
+
+        abort_unless($departmentId, 422, 'Choose a department first.');
+
+        $validated = $request->validate([
+            'amount' => ['required', 'numeric', 'min:'.self::MINIMUM_NAIRA, 'max:10000000'],
+            'starts_on' => ['required', 'date_format:Y-m'],
+        ], [
+            'starts_on.date_format' => 'Choose the month dues start from.',
+        ]);
+
+        $attributes = [
+            'amount' => (int) round($validated['amount'] * 100),
+            'starts_on' => "{$validated['starts_on']}-01",
+        ];
+
+        $due = Dues::standing($departmentId);
+
+        if ($due) {
+            $due->update($attributes);
+        } else {
+            Due::create([...$attributes, 'department_id' => $departmentId, 'title' => 'Monthly dues', 'type' => 'monthly']);
+        }
+
+        return back()->with('success', 'Monthly dues saved.');
     }
 
     /**
